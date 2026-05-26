@@ -2,11 +2,11 @@ import type { Obj } from "../types/object"
 
 export type SiloID = string;
 
-// Represents a Silo with an ID, name, and optional metafields
+// Represents a Silo with an ID, name, and optional properties
 export interface SiloFrontmatter {
-    id: SiloID;
+    readonly id: SiloID;
     name: string;
-    metafields?: Record<string, any>;
+    properties?: Record<string, any>;
 }
 
 export interface Silo {
