@@ -1,125 +1,44 @@
-// Tests for the silo filesystem operations
-// WARNING: Will attempt to test operations on the actual filesystem @ ~/Desktop
+import { afterEach, expect, test } from "bun:test";
+import type { Database } from "bun:sqlite";
 
-import { afterAll, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { getDatabaseMetadata, initDatabase } from "../../core/db/init";
 
-import {
-    createSilo,
-    deleteSilo,
-    isSilo,
-    readSilo,
-    readSiloFrontmatter,
-    writeSilo,
-} from "../../core/storage/fs/silos";
+let db: Database | undefined;
 
-const desktopPath = join(process.env.HOME ?? "", "Desktop");
-const testSiloPath = join(desktopPath, "Test_Silo");
-const nestedSiloPath = join(testSiloPath, "Nested_Silo");
-const deeplyNestedSiloPath = join(nestedSiloPath, "Deeply_Nested_Silo");
-
-afterAll(async () => {
-    await deleteSilo(testSiloPath);
+afterEach(() => {
+    db?.close();
+    db = undefined;
 });
 
-test("silo fs operations create, read by depth, write, and delete silos", async () => {
-    await deleteSilo(testSiloPath);
+test("database schema stores silos with required database or silo parents", () => {
+    db = initDatabase(":memory:");
+    const databaseID = getDatabaseMetadata(db).id;
 
-    const rootProperties = {
-        purpose: "silo fs test",
-        level: 0,
-        active: true,
-    };
-
-    const rootID = await createSilo(testSiloPath, "Test_Silo", rootProperties);
-    const nestedID = await createSilo(nestedSiloPath, "Nested_Silo", {
-        purpose: "nested silo fs test",
-        level: 1,
+    db.query(`
+        INSERT INTO silos (id, parent_id, name, properties)
+        VALUES ($id, $parentID, $name, '{}')
+    `).run({
+        $id: "s_root",
+        $parentID: databaseID,
+        $name: "Root",
     });
-    const deeplyNestedID = await createSilo(deeplyNestedSiloPath, "Deeply_Nested_Silo", {
-        purpose: "deeply nested silo fs test",
-        level: 2,
-    });
-
-    expect(rootID.startsWith("s_")).toBe(true);
-    expect(nestedID.startsWith("s_")).toBe(true);
-    expect(deeplyNestedID.startsWith("s_")).toBe(true);
-    expect(await isSilo(testSiloPath)).toBe(true);
-    expect(await isSilo(nestedSiloPath)).toBe(true);
-    expect(await isSilo(deeplyNestedSiloPath)).toBe(true);
-
-    const depth0 = await readSilo(testSiloPath, 0);
-    expect(depth0.frontmatter.id).toBe(rootID);
-    expect(depth0.frontmatter.name).toBe("Test_Silo");
-    expect(depth0.frontmatter.properties).toEqual(rootProperties);
-    expect(depth0.objects).toEqual([]);
-    expect(depth0.silos).toEqual([]);
-
-    const depth1 = await readSilo(testSiloPath, 1);
-    expect(depth1.silos).toHaveLength(1);
-    expect(depth1.silos[0]?.frontmatter.id).toBe(nestedID);
-    expect(depth1.silos[0]?.frontmatter.name).toBe("Nested_Silo");
-    expect(depth1.silos[0]?.silos).toEqual([]);
-
-    const depth2 = await readSilo(testSiloPath, 2);
-    expect(depth2.silos).toHaveLength(1);
-    expect(depth2.silos[0]?.silos).toHaveLength(1);
-    expect(depth2.silos[0]?.silos[0]?.frontmatter.id).toBe(deeplyNestedID);
-    expect(depth2.silos[0]?.silos[0]?.frontmatter.name).toBe("Deeply_Nested_Silo");
-
-    const rootFrontmatter = await readSiloFrontmatter(testSiloPath);
-    expect(rootFrontmatter).toEqual({
-        id: rootID,
-        name: "Test_Silo",
-        properties: rootProperties,
+    db.query(`
+        INSERT INTO silos (id, parent_id, name, properties)
+        VALUES ($id, $parentID, $name, '{}')
+    `).run({
+        $id: "s_child",
+        $parentID: "s_root",
+        $name: "Child",
     });
 
-    await expect(writeSilo(testSiloPath, {
-        id: "s_changed",
-        name: "Invalid_ID_Update",
-        properties: {
-            purpose: "should fail",
-        },
-    })).rejects.toThrow("Cannot change silo id");
-    expect((await readSiloFrontmatter(testSiloPath)).id).toBe(rootID);
-
-    await writeSilo(testSiloPath, {
-        id: rootID,
-        name: "Test_Silo_Updated",
-        properties: {
-            purpose: "updated root silo",
-            level: 0,
-            updated: true,
-        },
+    expect(db.query("SELECT parent_id AS parentID FROM silos WHERE id = 's_root'").get()).toEqual({
+        parentID: databaseID,
     });
-    await writeSilo(nestedSiloPath, {
-        id: nestedID,
-        name: "Nested_Silo_Updated",
-        properties: {
-            purpose: "updated nested silo",
-            level: 1,
-            updated: true,
-        },
+    expect(db.query("SELECT parent_id AS parentID FROM silos WHERE id = 's_child'").get()).toEqual({
+        parentID: "s_root",
     });
-    await writeSilo(deeplyNestedSiloPath, {
-        id: deeplyNestedID,
-        name: "Deeply_Nested_Silo_Updated",
-        properties: {
-            purpose: "updated deeply nested silo",
-            level: 2,
-            updated: true,
-        },
-    });
-
-    expect((await readSiloFrontmatter(testSiloPath)).name).toBe("Test_Silo_Updated");
-    expect((await readSiloFrontmatter(nestedSiloPath)).name).toBe("Nested_Silo_Updated");
-    expect((await readSiloFrontmatter(deeplyNestedSiloPath)).name).toBe("Deeply_Nested_Silo_Updated");
-
-    expect(await deleteSilo(deeplyNestedSiloPath)).toBe(true);
-    expect(existsSync(deeplyNestedSiloPath)).toBe(false);
-    expect(await isSilo(nestedSiloPath)).toBe(true);
-
-    expect(await deleteSilo(testSiloPath)).toBe(true);
-    expect(existsSync(testSiloPath)).toBe(false);
+    expect(() => db!.query(`
+        INSERT INTO silos (id, parent_id, name, properties)
+        VALUES ('s_parentless', NULL, 'Parentless', '{}')
+    `).run()).toThrow();
 });

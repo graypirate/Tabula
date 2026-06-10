@@ -1,10 +1,10 @@
 import YAML from "yaml";
 
-import type { ObjFrontmatter } from "../types/object";
-import type { SiloFrontmatter } from "../types/silo";
+import type { ObjMetadata } from "../types/object";
+import type { SiloMetadata } from "../types/silo";
 
 // HELPER - convert frontmatter to a dictionary
-function frontmatterToDict(frontmatter: ObjFrontmatter | SiloFrontmatter): Record<string, unknown> {
+function frontmatterToDict(frontmatter: ObjMetadata | SiloMetadata): Record<string, unknown> {
     return {
         id: frontmatter.id,
         name: frontmatter.name,
@@ -12,7 +12,7 @@ function frontmatterToDict(frontmatter: ObjFrontmatter | SiloFrontmatter): Recor
     };
 }
 
-export function renderFrontmatter(frontmatter: ObjFrontmatter | SiloFrontmatter): string {
+export function renderFrontmatter(frontmatter: ObjMetadata | SiloMetadata): string {
     const dict = frontmatterToDict(frontmatter);
     return `---\n${YAML.stringify(dict)}---\n`;
 }
