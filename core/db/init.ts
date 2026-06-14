@@ -21,26 +21,13 @@ type DatabaseRow = {
 export function initDatabase(path: string, name?: string): Database {
     const db = new Database(path);
     try {
+        db.exec("PRAGMA busy_timeout = 5000;");
         db.exec("PRAGMA foreign_keys = ON;");
 
         const isFresh = isEmptyDatabase(db);
 
         if (!isFresh) {
-            let metadata: DBMetadata;
-
-            try {
-                metadata = getDatabaseMetadata(db);
-            } catch {
-                throw new Error(
-                    `Incompatible database schema; expected valid version ${SchemaVersion} metadata`,
-                );
-            }
-
-            if (metadata.schemaVersion !== SchemaVersion) {
-                throw new Error(
-                    `Unsupported database schema version ${metadata.schemaVersion}; expected ${SchemaVersion}`,
-                );
-            }
+            validateDatabaseMetadata(db);
         }
 
         db.exec("PRAGMA journal_mode = WAL;");
@@ -56,6 +43,25 @@ export function initDatabase(path: string, name?: string): Database {
                 $schemaVersion: SchemaVersion,
             });
         }
+    } catch (error) {
+        db.close();
+        throw error;
+    }
+
+    return db;
+}
+
+/**
+ * Opens an existing initialized database without re-running schema setup.
+ * @param path - The path of the SQLite database
+ * @returns The opened SQLite database connection
+ */
+export function openDatabase(path: string): Database {
+    const db = new Database(path, { create: false, readwrite: true });
+    try {
+        db.exec("PRAGMA busy_timeout = 5000;");
+        db.exec("PRAGMA foreign_keys = ON;");
+        validateDatabaseMetadata(db);
     } catch (error) {
         db.close();
         throw error;
@@ -99,4 +105,22 @@ export function getDatabaseMetadata(db: Database): DBMetadata {
         name: row.name ?? undefined,
         schemaVersion: row.schemaVersion,
     };
+}
+
+function validateDatabaseMetadata(db: Database): void {
+    let metadata: DBMetadata;
+
+    try {
+        metadata = getDatabaseMetadata(db);
+    } catch {
+        throw new Error(
+            `Incompatible database schema; expected valid version ${SchemaVersion} metadata`,
+        );
+    }
+
+    if (metadata.schemaVersion !== SchemaVersion) {
+        throw new Error(
+            `Unsupported database schema version ${metadata.schemaVersion}; expected ${SchemaVersion}`,
+        );
+    }
 }

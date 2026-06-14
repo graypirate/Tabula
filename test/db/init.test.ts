@@ -4,7 +4,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { getDatabaseMetadata, initDatabase, SchemaVersion } from "../../core/db/init";
+import {
+    getDatabaseMetadata,
+    initDatabase,
+    openDatabase,
+    SchemaVersion,
+} from "../../core/db/init";
 
 let db: Database | undefined;
 let tempDirectory: string | undefined;
@@ -84,6 +89,16 @@ test("initDatabase rejects an empty metadata table without stamping schema v2", 
     expect(readSchema(unchanged)).toEqual(before);
     expect(unchanged.query('SELECT COUNT(*) AS count FROM "database"').get()).toEqual({ count: 0 });
     unchanged.close();
+});
+
+test("openDatabase validates existing metadata without running schema setup", () => {
+    const path = createTempDatabasePath();
+    db = initDatabase(path, "Existing");
+    const metadata = getDatabaseMetadata(db);
+    db.close();
+
+    db = openDatabase(path);
+    expect(getDatabaseMetadata(db)).toEqual(metadata);
 });
 
 function createTempDatabasePath(): string {
