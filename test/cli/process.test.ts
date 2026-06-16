@@ -114,7 +114,7 @@ describe("CLI process output", () => {
         const childBlockID = object.blocks[0]!.children[0]!.id;
 
         expect(await successfulJSON<Obj>([
-            "get",
+            "read",
             objectID,
             "--database",
             databasePath,
@@ -233,7 +233,7 @@ describe("CLI process output", () => {
         ]);
 
         const commands = [
-            ["get", initialized.id, "--database", databasePath],
+            ["read", initialized.id, "--database", databasePath],
             ["list", initialized.id, "--database", databasePath],
             ["search", "missing", "--database", databasePath],
         ];
@@ -247,7 +247,7 @@ describe("CLI process output", () => {
     });
 
     test("writes syntax and validation failures only to stderr with exit 2", async () => {
-        const missingDatabase = await spawnCLI(["get", "o_example"]);
+        const missingDatabase = await spawnCLI(["read", "o_example"]);
         expect(missingDatabase.exitCode).toBe(2);
         expect(missingDatabase.stdout).toBe("");
         expect(JSON.parse(missingDatabase.stderr)).toEqual({
@@ -307,7 +307,7 @@ describe("CLI process output", () => {
 
     test("maps database and API failures to exit 1", async () => {
         const missing = await spawnCLI([
-            "get",
+            "read",
             "o_missing",
             "--database",
             join(tmpdir(), `agentdb-missing-${crypto.randomUUID()}.sqlite`),
@@ -325,7 +325,7 @@ describe("CLI process output", () => {
             databasePath,
         ]);
         const mismatch = await spawnCLI([
-            "get",
+            "read",
             "d_different",
             "--database",
             databasePath,
@@ -337,7 +337,7 @@ describe("CLI process output", () => {
         });
 
         const missingObject = await spawnCLI([
-            "get",
+            "read",
             "o_missing",
             "--database",
             databasePath,

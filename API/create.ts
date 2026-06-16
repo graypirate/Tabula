@@ -3,11 +3,11 @@ import type { Database } from "bun:sqlite";
 import { insertStoredBlock, isStoredBlock } from "../core/db/blocks";
 import { insertStoredObject, isStoredObject } from "../core/db/objects";
 import { insertSilo, isSilo } from "../core/db/silos";
-import type { StoredBlock } from "../core/types/block";
-import type { StoredObject } from "../core/types/object";
+import type { StoredObject } from "../core/db/types";
+import type { Block } from "../core/types/block";
+import type { Obj } from "../core/types/object";
 import type { SiloMetadata } from "../core/types/silo";
 import { createBlockID, createObjID, createSiloID } from "../core/utils/id";
-import type { Block, Obj } from "./types";
 
 type Properties = Record<string, unknown>;
 
@@ -54,7 +54,7 @@ export function createBlock(
     content: string,
     properties: Properties = {},
 ): Block {
-    const block: StoredBlock = {
+    const block: Block = {
         id: createAvailableID(createBlockID, (id) => isStoredBlock(db, id)),
         content,
         properties,

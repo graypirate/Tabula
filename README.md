@@ -123,14 +123,14 @@ that object's placement tree, but their canonical block records remain stored.
 ### Read And List
 
 ```bash
-agentdb get o_example --database ./workspace.sqlite
+agentdb read o_example --database ./workspace.sqlite
 agentdb list d_example --database ./workspace.sqlite
 agentdb list s_example --database ./workspace.sqlite
 agentdb list o_example --database ./workspace.sqlite
 agentdb list b_example --database ./workspace.sqlite --object o_example
 ```
 
-`get` returns the complete entity. Object reads return the same recursive shape
+`read` returns the complete entity. Object reads return the same recursive shape
 accepted by `write`, allowing direct read-edit-write round trips.
 
 `list` returns metadata and direct children:
@@ -141,7 +141,7 @@ accepted by `write`, allowing direct read-edit-write round trips.
 - A block listed with `--object` also returns its ancestors and direct children
   within that object's placement tree.
 
-When getting or listing a database ID, it must match the database stored at the
+When reading or listing a database ID, it must match the database stored at the
 provided path.
 
 ### Search And Delete
@@ -178,7 +178,10 @@ stdout.
 
 ## Object Type Boundary
 
-The original `Block`, `Obj`, and `ObjectBlock` types represented SQLite storage
-data. They were renamed to `StoredBlock`, `StoredObject`, and `BlockPlacement`
-so the API can use the generic names for its client-facing model. Flat
-placements remain internal because they map directly to SQLite.
+`core/types` defines the public entity shapes exported by the API. Universal
+metadata interfaces are extended by `Block`, recursive `ObjectBlock`, `Obj`,
+and `Silo` types.
+
+Storage-only `StoredObject` and `StoredObjectBlock` types live in `core/db`.
+They represent the flat relational form used by SQLite and are not exported by
+the API.

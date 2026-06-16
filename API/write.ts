@@ -11,20 +11,28 @@ import {
     isStoredObject,
     updateStoredObject,
 } from "../core/db/objects";
-import type { StoredBlock, BlockID, BlockPlacement } from "../core/types/block";
-import type { ObjID, StoredObject } from "../core/types/object";
+import type { StoredObject } from "../core/db/types";
+import type { Block, BlockID, ObjectBlock } from "../core/types/block";
+import type { Obj, ObjID } from "../core/types/object";
 import { createBlockID, createObjID } from "../core/utils/id";
-import type {
-    Block,
-    BlockWrite,
-    Obj,
-    ObjectBlock,
-    ObjectBlockWrite,
-    ObjectWrite,
-} from "./types";
+import { flattenObjectBlocks } from "./types";
+
+export type BlockWrite = Omit<Block, "id"> & {
+    id?: BlockID;
+};
+
+export type ObjectBlockWrite = Omit<ObjectBlock, "id" | "children"> & {
+    id?: BlockID;
+    children: ObjectBlockWrite[];
+};
+
+export type ObjectWrite = Omit<Obj, "id" | "blocks"> & {
+    id?: ObjID;
+    blocks: ObjectBlockWrite[];
+};
 
 export function writeBlock(db: Database, input: BlockWrite): Block {
-    const block: StoredBlock = {
+    const block: Block = {
         id: input.id ?? createAvailableBlockID(db),
         content: input.content,
         properties: input.properties ?? {},
@@ -41,7 +49,8 @@ export function writeBlock(db: Database, input: BlockWrite): Block {
 
 export function writeObject(db: Database, input: ObjectWrite): Obj {
     const objectID = input.id ?? createAvailableObjectID(db);
-    const { blocks, placements } = prepareBlocks(db, input.blocks);
+    const blocks = prepareBlocks(db, input.blocks);
+    const placements = flattenObjectBlocks(blocks);
     const storedObject: StoredObject = {
         id: objectID,
         parentID: input.parentID,
@@ -69,19 +78,17 @@ export function writeObject(db: Database, input: ObjectWrite): Obj {
     };
 }
 
-/** Assigns IDs while producing public blocks and stored flat placements. */
+/** Assigns IDs while producing public object blocks. */
 function prepareBlocks(
     db: Database,
     roots: ObjectBlockWrite[],
-): { blocks: ObjectBlock[]; placements: BlockPlacement[] } {
-    const placements: BlockPlacement[] = [];
+): ObjectBlock[] {
     const usedIDs = new Set<BlockID>();
 
     const visit = (
         children: ObjectBlockWrite[],
-        parentBlockID?: BlockID,
     ): ObjectBlock[] =>
-        children.map((input, position) => {
+        children.map((input) => {
             const id = input.id ?? createAvailableBlockID(db, usedIDs);
             if (usedIDs.has(id)) {
                 throw new Error(`Duplicate block ID in object: ${id}`);
@@ -91,25 +98,15 @@ function prepareBlocks(
             }
 
             usedIDs.add(id);
-            placements.push({
-                id,
-                content: input.content,
-                properties: input.properties ?? {},
-                parentBlockID,
-                position,
-            });
             return {
                 id,
                 content: input.content,
                 properties: input.properties ?? {},
-                children: visit(input.children, id),
+                children: visit(input.children),
             };
         });
 
-    return {
-        blocks: visit(roots),
-        placements,
-    };
+    return visit(roots);
 }
 
 /** Generates an object ID that is not already stored. */

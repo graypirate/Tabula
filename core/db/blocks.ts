@@ -1,8 +1,9 @@
 import type { Database } from "bun:sqlite";
 
-import type { StoredBlock, BlockID, BlockMetadata, BlockPlacement } from "../types/block";
+import type { Block, BlockID, BlockMetadata } from "../types/block";
 import type { ObjID } from "../types/object";
 import { BlockPrefix, ObjectPrefix } from "../utils/id";
+import type { StoredObjectBlock } from "./types";
 
 // MARK: -- Canonical Block Operations
 
@@ -11,7 +12,7 @@ import { BlockPrefix, ObjectPrefix } from "../utils/id";
  * @param db - The database containing the block
  * @param block - The block to insert
  */
-export function insertStoredBlock(db: Database, block: StoredBlock): void {
+export function insertStoredBlock(db: Database, block: Block): void {
     validateBlock(block);
 
     if (isStoredBlock(db, block.id)) {
@@ -29,7 +30,7 @@ export function insertStoredBlock(db: Database, block: StoredBlock): void {
  * @param db - The database containing the blocks
  * @param blocks - The blocks to insert
  */
-export function insertStoredBlocks(db: Database, blocks: StoredBlock[]): void {
+export function insertStoredBlocks(db: Database, blocks: Block[]): void {
     if (blocks.length === 0) {
         return;
     }
@@ -84,7 +85,7 @@ export function getBlockMetadata(db: Database, blockID: BlockID): BlockMetadata 
  * @param blockID - The ID of the block to read
  * @returns The full block at the specified ID
  */
-export function getStoredBlock(db: Database, blockID: BlockID): StoredBlock {
+export function getStoredBlock(db: Database, blockID: BlockID): Block {
     const row = db.query(`
         SELECT id, content, properties
         FROM blocks
@@ -107,7 +108,7 @@ export function getStoredBlock(db: Database, blockID: BlockID): StoredBlock {
  * @param db - The database containing the block
  * @param block - The block to update
  */
-export function updateStoredBlock(db: Database, block: StoredBlock): void {
+export function updateStoredBlock(db: Database, block: Block): void {
     updateStoredBlocks(db, [block]);
 }
 
@@ -116,7 +117,7 @@ export function updateStoredBlock(db: Database, block: StoredBlock): void {
  * @param db - The database containing the blocks
  * @param blocks - The blocks to update
  */
-export function updateStoredBlocks(db: Database, blocks: StoredBlock[]): void {
+export function updateStoredBlocks(db: Database, blocks: Block[]): void {
     if (blocks.length === 0) {
         return;
     }
@@ -309,7 +310,7 @@ export function updateBlockPlacements(db: Database, objectID: ObjID, blocks: { i
  * @param objectID - The object whose blocks should be read
  * @returns The object's blocks in deterministic depth-first preorder
  */
-export function getBlockPlacements(db: Database, objectID: ObjID): BlockPlacement[] {
+export function getBlockPlacements(db: Database, objectID: ObjID): StoredObjectBlock[] {
     validateObject(db, objectID);
     const rows = db.query(`
         WITH RECURSIVE placements(blockID, parentBlockID, position, path) AS (
@@ -409,7 +410,7 @@ export function deleteBlockPlacements(db: Database, objectID: ObjID, blockIDs: B
  * @param objectID - The object whose blocks should be synchronized
  * @param blocks - The complete desired block compilation
  */
-export function syncBlockPlacements(db: Database, objectID: ObjID, blocks: BlockPlacement[]): void {
+export function syncBlockPlacements(db: Database, objectID: ObjID, blocks: StoredObjectBlock[]): void {
     validateObject(db, objectID);
     const desiredPlacements = validateObjectBlockPlacementBatch(blocks);
     validateObjectBlockPlacementTree(objectID, desiredPlacements);
@@ -478,14 +479,14 @@ export function syncBlockPlacements(db: Database, objectID: ObjID, blocks: Block
 // MARK: -- Internal Validation Helpers
 
 /** Validates a canonical block. */
-function validateBlock(block: StoredBlock): void {
+function validateBlock(block: Block): void {
     if (!block.id.startsWith(`${BlockPrefix}_`)) {
         throw new Error(`Invalid block id: ${block.id}`);
     }
 }
 
 /** Validates a canonical block batch and returns its unique IDs. */
-function validateBlockBatch(blocks: StoredBlock[]): Set<BlockID> {
+function validateBlockBatch(blocks: Block[]): Set<BlockID> {
     const ids = new Set<BlockID>();
 
     for (const block of blocks) {
@@ -692,7 +693,7 @@ function vacatePlacementPositions(db: Database, objectID: ObjID, blockIDs: Block
 }
 
 /** Maps a canonical block to named SQLite parameters. */
-function blockParameters(block: StoredBlock): Record<string, string> {
+function blockParameters(block: Block): Record<string, string> {
     return {
         $id: block.id,
         $content: block.content,

@@ -1,10 +1,9 @@
-import type { BlockPlacement } from "./block";
+import type { ObjectBlock } from "./block";
 import type { DatabaseID } from "./database";
 import type { SiloID } from "./silo";
 
 export type ObjID = string;
 
-// Represents an Object with an ID, name, and optional properties
 export interface ObjMetadata {
     readonly id: ObjID;
     parentID: DatabaseID | SiloID;
@@ -12,6 +11,7 @@ export interface ObjMetadata {
     properties?: Record<string, unknown>;
 }
 
-export interface StoredObject extends ObjMetadata {
-    blocks: BlockPlacement[];
+// Recursive structure
+export interface Obj extends ObjMetadata {
+    blocks: ObjectBlock[];
 }

@@ -4,11 +4,11 @@ import { getBlockMetadata, getBlockPlacements, getStoredBlock } from "../core/db
 import { getDatabaseMetadata } from "../core/db/init";
 import { getObjectMetadata, getStoredObject } from "../core/db/objects";
 import { getSilo } from "../core/db/silos";
-import type { BlockID, BlockMetadata, BlockPlacement } from "../core/types/block";
+import type { Block, BlockID, BlockMetadata } from "../core/types/block";
 import type { DBMetadata, DatabaseID } from "../core/types/database";
-import type { ObjID, ObjMetadata } from "../core/types/object";
+import type { Obj, ObjID, ObjMetadata } from "../core/types/object";
 import type { SiloID, SiloMetadata } from "../core/types/silo";
-import type { Block, Obj, ObjectBlock } from "./types";
+import { expandStoredObject } from "./types";
 
 // MARK: List interfaces
 
@@ -47,11 +47,7 @@ export function readSilo(db: Database, siloID: SiloID): SiloMetadata {
 }
 
 export function readObject(db: Database, objectID: ObjID): Obj {
-    const object = getStoredObject(db, objectID);
-    return {
-        ...object,
-        blocks: buildBlockTree(object.blocks),
-    };
+    return expandStoredObject(getStoredObject(db, objectID));
 }
 
 export function readBlock(db: Database, blockID: BlockID): Block {
@@ -152,25 +148,4 @@ function readContainerChildren(
         silos: silos.map((row) => row.id),
         objects: objects.map((row) => row.id),
     };
-}
-
-/** Reconstructs the public recursive block tree from stored flat placements. */
-function buildBlockTree(placements: BlockPlacement[]): ObjectBlock[] {
-    const childrenByParent = new Map<BlockID | undefined, BlockPlacement[]>();
-
-    for (const placement of placements) {
-        const children = childrenByParent.get(placement.parentBlockID) ?? [];
-        children.push(placement);
-        childrenByParent.set(placement.parentBlockID, children);
-    }
-
-    const buildChildren = (parentBlockID?: BlockID): ObjectBlock[] =>
-        (childrenByParent.get(parentBlockID) ?? [])
-            .sort((left, right) => left.position - right.position)
-            .map(({ parentBlockID: _, position: __, ...block }) => ({
-                ...block,
-                children: buildChildren(block.id),
-            }));
-
-    return buildChildren();
 }

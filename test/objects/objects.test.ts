@@ -19,8 +19,7 @@ import {
     updateStoredObject,
     updateObjectMetadata,
 } from "../../core/db/objects";
-import type { BlockPlacement } from "../../core/types/block";
-import type { StoredObject } from "../../core/types/object";
+import type { StoredObject, StoredObjectBlock } from "../../core/db/types";
 
 let db: Database | undefined;
 
@@ -251,6 +250,6 @@ function placement(id: string, parentBlockID: string | undefined, position: numb
     return { id, parentBlockID, position };
 }
 
-function objectBlock(id: string, content: string, parentBlockID: string | undefined, position: number): BlockPlacement {
+function objectBlock(id: string, content: string, parentBlockID: string | undefined, position: number): StoredObjectBlock {
     return { id, content, parentBlockID, position };
 }

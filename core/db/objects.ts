@@ -1,8 +1,9 @@
 import type { Database } from "bun:sqlite";
 
 import { getBlockPlacements, syncBlockPlacements } from "./blocks";
-import type { ObjMetadata, ObjID, StoredObject } from "../types/object";
+import type { ObjMetadata, ObjID } from "../types/object";
 import { DatabasePrefix, ObjectPrefix, SiloPrefix } from "../utils/id";
+import type { StoredObject } from "./types";
 
 type ObjectRow = {
     id: string;

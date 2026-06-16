@@ -106,13 +106,17 @@ describe("CLI argument parsing", () => {
             "INVALID_OPTION",
         );
         expectInputError(
-            () => parseCommand(["get", "o_example", "-d", "agent.db"]),
+            () => parseCommand(["read", "o_example", "-d", "agent.db"]),
             "UNKNOWN_OPTION",
+        );
+        expectInputError(
+            () => parseCommand(["get", "o_example", "--database", "agent.db"]),
+            "INVALID_COMMAND",
         );
     });
 
     test("requires the database and validates search and deletion targets", () => {
-        expectInputError(() => parseCommand(["get", "o_example"]), "MISSING_OPTION");
+        expectInputError(() => parseCommand(["read", "o_example"]), "MISSING_OPTION");
         expectInputError(
             () => parseCommand([
                 "create",
@@ -146,7 +150,7 @@ describe("CLI argument parsing", () => {
     test("rejects unknown, duplicate, and command-inappropriate options", () => {
         expectInputError(
             () => parseCommand([
-                "get",
+                "read",
                 "o_example",
                 "--database",
                 "agent.db",
@@ -157,7 +161,7 @@ describe("CLI argument parsing", () => {
         );
         expectInputError(
             () => parseCommand([
-                "get",
+                "read",
                 "o_example",
                 "--database",
                 "first.db",

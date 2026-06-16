@@ -21,7 +21,7 @@ export type CLICommand =
         propertyValues: string[];
     }
     | { action: "write"; database: string }
-    | { action: "get"; database: string; id: string }
+    | { action: "read"; database: string; id: string }
     | { action: "list"; database: string; id: string; objectID?: string }
     | { action: "delete"; database: string; id: string }
     | { action: "search"; database: string; query: string; type?: SearchType };
@@ -71,8 +71,8 @@ export function parseCommand(argv: string[]): CLICommand {
             allowOptions(parsed, ["database"]);
             return { action, database };
 
-        case "get": {
-            requirePositionals(parsed, 2, "agentdb get ID --database PATH");
+        case "read": {
+            requirePositionals(parsed, 2, "agentdb read ID --database PATH");
             allowOptions(parsed, ["database"]);
             const id = parsed.positionals[1]!;
             inferEntityType(id);

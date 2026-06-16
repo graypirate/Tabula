@@ -73,8 +73,8 @@ export function dispatchCommand(command: CLICommand, writeInput?: WriteInput): u
                 return writeInput.entity === "object"
                     ? writeObject(db, writeInput.value)
                     : writeBlock(db, writeInput.value);
-            case "get":
-                return getEntity(db, command.id);
+            case "read":
+                return readEntity(db, command.id);
             case "list":
                 return listEntity(db, command.id, command.objectID);
             case "delete":
@@ -111,7 +111,7 @@ function withInitializedDatabase(
     }
 }
 
-function getEntity(db: Database, id: string): unknown {
+function readEntity(db: Database, id: string): unknown {
     switch (inferEntityType(id)) {
         case "database":
             return readMatchingDatabase(db, id);
