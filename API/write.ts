@@ -1,125 +1,140 @@
 import type { Database } from "bun:sqlite";
 
 import {
-    insertStoredBlock,
-    syncBlockPlacements,
-    updateStoredBlock,
-} from "../core/db/blocks";
-import {
-    insertStoredObject,
-    updateStoredObject,
-} from "../core/db/objects";
-import type { StoredObject } from "../core/db/types";
-import type { Block, BlockID, ObjectBlock } from "../core/types/block";
+    entityExists,
+    readEntityParentID,
+    writeEntityTree,
+} from "../core/storage";
+import type { Block, BlockID } from "../core/types/block";
+import type { Entity } from "../core/types/entity";
 import type { Obj, ObjID } from "../core/types/object";
 import { createBlockID, createObjID } from "../core/utils/id";
-import { flattenObjectBlocks } from "./types";
+import {
+    type BlockResult,
+    type EntityCreateOptions,
+    type EntityResult,
+    type ObjectResult,
+} from "./types";
 
-export type BlockWrite = Omit<Block, "id"> & {
+export type EntityWrite = ObjectWrite | BlockWrite;
+
+export type BlockWrite = Omit<Block, "id" | "children"> & {
     id?: BlockID;
+    children: EntityWrite[];
 };
 
-export type ObjectBlockWrite = Omit<ObjectBlock, "id" | "children"> & {
-    id?: BlockID;
-    children: ObjectBlockWrite[];
-};
-
-export type ObjectWrite = Omit<Obj, "id" | "blocks"> & {
+export type ObjectWrite = Omit<Obj, "id" | "children"> & {
     id?: ObjID;
-    blocks: ObjectBlockWrite[];
+    children: EntityWrite[];
 };
 
-export function writeBlock(db: Database, input: BlockWrite): Block {
-    const block: Block = {
-        id: input.id ?? createAvailableBlockID(),
-        content: input.content,
-        properties: input.properties ?? {},
-    };
-
-    if (input.id === undefined) {
-        insertStoredBlock(db, block);
-    } else {
-        updateStoredBlock(db, block);
-    }
-
-    return block;
-}
-
-export function writeObject(db: Database, input: ObjectWrite): Obj {
-    const objectID = input.id ?? createAvailableObjectID();
-    const { blocks, explicitBlockIDs } = prepareBlocks(input.blocks);
-    const placements = flattenObjectBlocks(blocks);
-    const storedObject: StoredObject = {
-        id: objectID,
-        parentID: input.parentID,
-        name: input.name,
-        properties: input.properties ?? {},
-        blocks: placements,
-    };
-
-    const write = db.transaction(() => {
-        if (input.id === undefined) {
-            insertStoredObject(db, storedObject);
-            syncBlockPlacements(db, objectID, placements, explicitBlockIDs);
-        } else {
-            updateStoredObject(db, storedObject, explicitBlockIDs);
-        }
-    });
-
-    write();
+/**
+ * Creates or replaces an object or block tree.
+ * @param db - The database receiving the write
+ * @param input - The recursive entity input
+ * @param options - Optional parent placement for the root entity
+ * @returns The stored parent-aware recursive entity result
+ */
+export function writeEntity(
+    db: Database,
+    input: EntityWrite,
+    options: EntityCreateOptions = {},
+): EntityResult {
+    const entity = prepareEntity(db, input);
+    const stored = writeEntityTree(db, entity, options.parentID ?? undefined);
     return {
-        id: objectID,
-        parentID: input.parentID,
-        name: input.name,
-        properties: input.properties ?? {},
-        blocks,
+        parentID: readEntityParentID(db, stored.id),
+        entity: stored,
     };
 }
 
-/** Assigns IDs while producing public object blocks. */
-function prepareBlocks(
-    roots: ObjectBlockWrite[],
-): { blocks: ObjectBlock[]; explicitBlockIDs: Set<BlockID> } {
-    const usedIDs = new Set<BlockID>();
-    const explicitBlockIDs = new Set<BlockID>();
+/**
+ * Creates or replaces a block tree.
+ * @param db - The database receiving the write
+ * @param input - The recursive block input
+ * @param options - Optional parent placement for the root block
+ * @returns The stored recursive block tree
+ */
+export function writeBlock(
+    db: Database,
+    input: BlockWrite,
+    options: EntityCreateOptions = {},
+): BlockResult {
+    const result = writeEntity(db, input, options);
+    assertBlockResult(result);
+    return result;
+}
 
-    const visit = (
-        children: ObjectBlockWrite[],
-    ): ObjectBlock[] =>
-        children.map((input) => {
-            const id = input.id ?? createAvailableBlockID(usedIDs);
-            if (usedIDs.has(id)) {
-                throw new Error(`Duplicate block ID in object: ${id}`);
-            }
-            if (input.id !== undefined) {
-                explicitBlockIDs.add(id);
-            }
+/**
+ * Creates or replaces an object tree.
+ * @param db - The database receiving the write
+ * @param input - The recursive object input
+ * @param options - Optional parent placement for the root object
+ * @returns The stored recursive object tree
+ */
+export function writeObject(
+    db: Database,
+    input: ObjectWrite,
+    options: EntityCreateOptions = {},
+): ObjectResult {
+    const result = writeEntity(db, input, options);
+    assertObjectResult(result);
+    return result;
+}
 
-            usedIDs.add(id);
+/** Assigns IDs while producing a recursive public entity tree. */
+function prepareEntity(db: Database, input: EntityWrite): Entity {
+    const usedIDs = new Set<string>();
+
+    const visit = (entity: EntityWrite): Entity => {
+        const id = entity.id ?? createAvailableEntityID(db, entity.type, usedIDs);
+        if (usedIDs.has(id)) {
+            throw new Error(`Duplicate entity ID in write tree: ${id}`);
+        }
+        usedIDs.add(id);
+
+        const children = entity.children.map(visit);
+
+        if (entity.type === "object") {
             return {
                 id,
-                content: input.content,
-                properties: input.properties ?? {},
-                children: visit(input.children),
+                type: "object",
+                name: entity.name,
+                properties: entity.properties ?? {},
+                children,
             };
-        });
+        }
 
-    return {
-        blocks: visit(roots),
-        explicitBlockIDs,
+        return {
+            id,
+            type: "block",
+            content: entity.content,
+            properties: entity.properties ?? {},
+            children,
+        };
     };
+
+    return visit(input);
 }
 
-/** Generates an object ID. */
-function createAvailableObjectID(): ObjID {
-    return createObjID();
+function assertObjectResult(result: EntityResult): asserts result is ObjectResult {
+    if (result.entity.type !== "object") {
+        throw new Error("Expected object result");
+    }
 }
 
-/** Generates a block ID that is neither stored nor reserved by the current write. */
-function createAvailableBlockID(reserved: Set<BlockID> = new Set()): BlockID {
-    let id = createBlockID();
-    while (reserved.has(id)) {
-        id = createBlockID();
+function assertBlockResult(result: EntityResult): asserts result is BlockResult {
+    if (result.entity.type !== "block") {
+        throw new Error("Expected block result");
+    }
+}
+
+/** Generates an unused entity ID for the requested entity type. */
+function createAvailableEntityID(db: Database, type: Entity["type"], reserved: Set<string>): string {
+    const createID = type === "object" ? createObjID : createBlockID;
+    let id = createID();
+    while (reserved.has(id) || entityExists(db, id)) {
+        id = createID();
     }
     return id;
 }

@@ -8,6 +8,7 @@ import type {
     BlockList,
     DBMetadata,
     DatabaseList,
+    EntityResult,
     Obj,
     ObjectList,
     SearchResult,
@@ -24,7 +25,7 @@ afterEach(() => {
 });
 
 describe("CLI process output", () => {
-    test("executes the complete recursive JSON workflow across processes", async () => {
+    test("executes the complete recursive entity workflow across processes", async () => {
         const databasePath = createDatabasePath();
 
         const initialized = await successfulJSON<DBMetadata>([
@@ -37,16 +38,14 @@ describe("CLI process output", () => {
         expect(initialized.id).toStartWith("d_");
         expect(initialized).toMatchObject({
             name: "CLI Test",
-            schemaVersion: "0.1.0",
+            schemaVersion: "0.2.0",
         });
 
-        const emptyObject = await successfulJSON<Obj>([
+        const emptyObjectResult = await successfulJSON<EntityResult<Obj>>([
             "create",
             "object",
             "--database",
             databasePath,
-            "--parent",
-            initialized.id,
             "--name",
             "Empty",
             "--property",
@@ -54,13 +53,15 @@ describe("CLI process output", () => {
             "--property",
             "priority=2",
         ]);
-        expect(emptyObject.blocks).toEqual([]);
+        const emptyObject = emptyObjectResult.entity;
+        expect(emptyObjectResult.parentID).toBe(initialized.id);
+        expect(emptyObject.children).toEqual([]);
         expect(emptyObject).toMatchObject({
-            parentID: initialized.id,
+            type: "object",
             properties: { status: "active", priority: 2 },
         });
 
-        const quickBlock = await successfulJSON<Block>([
+        const quickBlockResult = await successfulJSON<EntityResult<Block>>([
             "create",
             "block",
             "--database",
@@ -70,49 +71,70 @@ describe("CLI process output", () => {
             "--property",
             "done=false",
         ]);
+        const quickBlock = quickBlockResult.entity;
+        expect(quickBlockResult.parentID).toBeNull();
         expect(quickBlock.id).toStartWith("b_");
+        expect(quickBlock.children).toEqual([]);
         expect(quickBlock.properties).toEqual({ done: false });
 
-        const object = await successfulJSON<Obj>([
+        const childBlockResult = await successfulJSON<EntityResult<Block>>([
+            "create",
+            "block",
+            "--database",
+            databasePath,
+            "--content",
+            "Child quick block",
+            "--parent",
+            emptyObject.id,
+        ]);
+        expect(childBlockResult.parentID).toBe(emptyObject.id);
+        expect(childBlockResult.entity.children).toEqual([]);
+
+        const objectResult = await successfulJSON<EntityResult<Obj>>([
             "write",
             "--database",
             databasePath,
         ], JSON.stringify({
-            parentID: initialized.id,
+            type: "object",
             name: "AgentDB",
             properties: { stage: "MVP" },
-            blocks: [{
+            children: [{
+                type: "block",
                 content: "Build the CLI",
                 properties: { done: false },
                 children: [{
-                    content: "Validate recursive JSON",
+                    type: "object",
+                    name: "Validate recursive JSON",
                     children: [],
                 }],
             }, {
+                type: "block",
                 content: "Ship",
                 children: [],
             }],
         }));
+        const object = objectResult.entity;
+        expect(objectResult.parentID).toBe(initialized.id);
         expect(object.id).toStartWith("o_");
-        expect(object.blocks).toHaveLength(2);
-        expect(object.blocks[0]?.children).toHaveLength(1);
+        expect(object.children).toHaveLength(2);
+        expect(object.children[0]?.children).toHaveLength(1);
         const objectID = object.id;
-        const parentBlockID = object.blocks[0]!.id;
-        const childBlockID = object.blocks[0]!.children[0]!.id;
+        const parentBlockID = object.children[0]!.id;
+        const childObjectID = object.children[0]!.children[0]!.id;
 
-        expect(await successfulJSON<Obj>([
+        expect(await successfulJSON<EntityResult<Obj>>([
             "read",
             objectID,
             "--database",
             databasePath,
-        ])).toEqual(object);
+        ])).toEqual(objectResult);
 
-        const rewritten = await successfulJSON<Obj>([
+        const rewritten = await successfulJSON<EntityResult<Obj>>([
             "write",
             "--database",
             databasePath,
         ], JSON.stringify(object));
-        expect(rewritten).toEqual(object);
+        expect(rewritten).toEqual(objectResult);
 
         expect(await successfulJSON<ObjectList>([
             "list",
@@ -120,30 +142,32 @@ describe("CLI process output", () => {
             "--database",
             databasePath,
         ])).toEqual({
+            parentID: initialized.id,
             metadata: {
                 id: objectID,
-                parentID: initialized.id,
+                type: "object",
                 name: "AgentDB",
                 properties: { stage: "MVP" },
             },
-            blocks: [parentBlockID, object.blocks[1]!.id],
+            children: [
+                { type: "block", id: parentBlockID },
+                { type: "block", id: object.children[1]!.id },
+            ],
         });
 
         expect(await successfulJSON<BlockList>([
             "list",
-            childBlockID,
+            parentBlockID,
             "--database",
             databasePath,
-            "--object",
-            objectID,
         ])).toEqual({
+            parentID: objectID,
             metadata: {
-                id: childBlockID,
-                properties: {},
+                id: parentBlockID,
+                type: "block",
+                properties: { done: false },
             },
-            objectID,
-            ancestors: [parentBlockID],
-            children: [],
+            children: [{ type: "object", id: childObjectID }],
         });
 
         const databaseList = await successfulJSON<DatabaseList>([
@@ -152,7 +176,8 @@ describe("CLI process output", () => {
             "--database",
             databasePath,
         ]);
-        expect(databaseList.objects).toEqual([objectID, emptyObject.id]);
+        expect(databaseList.parentID).toBeNull();
+        expect(databaseList.objects).toEqual([emptyObject.id, objectID]);
 
         expect(await successfulJSON<boolean>([
             "delete",
@@ -166,28 +191,39 @@ describe("CLI process output", () => {
         const databasePath = createDatabasePath();
         await successfulJSON<DBMetadata>(["init", "--database", databasePath]);
 
-        const created = await successfulJSON<Block>([
+        const createdResult = await successfulJSON<EntityResult<Block>>([
             "write",
             "--database",
             databasePath,
         ], JSON.stringify({
+            type: "block",
             content: "Searchable standalone content",
+            children: [],
         }));
+        const created = createdResult.entity;
+        expect(createdResult.parentID).toBeNull();
         expect(created.id).toStartWith("b_");
 
-        const updated = await successfulJSON<Block>([
+        const updated = await successfulJSON<EntityResult<Block>>([
             "write",
             "--database",
             databasePath,
         ], JSON.stringify({
             id: created.id,
+            type: "block",
             content: "Searchable updated content",
             properties: { version: 2 },
+            children: [],
         }));
         expect(updated).toEqual({
-            id: created.id,
-            content: "Searchable updated content",
-            properties: { version: 2 },
+            parentID: null,
+            entity: {
+                id: created.id,
+                type: "block",
+                content: "Searchable updated content",
+                properties: { version: 2 },
+                children: [],
+            },
         });
 
         expect(await successfulJSON<SearchResult[]>([
@@ -255,24 +291,19 @@ describe("CLI process output", () => {
             error: { code: "INVALID_JSON" },
         });
 
-        const storageShape = await spawnCLI([
+        const oldShape = await spawnCLI([
             "write",
             "--database",
             "agent.db",
         ], JSON.stringify({
             parentID: "d_parent",
             name: "Invalid",
-            blocks: [{
-                content: "Flat",
-                parentBlockID: "b_parent",
-                position: 0,
-                children: [],
-            }],
+            blocks: [],
         }));
-        expect(storageShape.exitCode).toBe(2);
-        expect(storageShape.stdout).toBe("");
-        expect(JSON.parse(storageShape.stderr)).toMatchObject({
-            error: { code: "UNKNOWN_FIELD" },
+        expect(oldShape.exitCode).toBe(2);
+        expect(oldShape.stdout).toBe("");
+        expect(JSON.parse(oldShape.stderr)).toMatchObject({
+            error: { code: "INVALID_FIELD" },
         });
 
         const invalidProperty = await spawnCLI([
@@ -334,7 +365,7 @@ describe("CLI process output", () => {
         expect(JSON.parse(missingObject.stderr)).toMatchObject({
             error: {
                 code: "OPERATION_FAILED",
-                message: "Object not found: o_missing",
+                message: "Entity not found: o_missing",
             },
         });
         expect(initialized.id).toStartWith("d_");

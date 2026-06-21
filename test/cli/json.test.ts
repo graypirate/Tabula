@@ -4,15 +4,17 @@ import { CLIInputError } from "../../CLI/errors.ts";
 import { parseWriteInput } from "../../CLI/json.ts";
 
 describe("CLI JSON validation", () => {
-    test("validates recursive object writes using the public API shape", () => {
+    test("validates recursive object writes using the public entity shape", () => {
         expect(parseWriteInput(JSON.stringify({
-            parentID: "d_parent",
+            type: "object",
             name: "Example",
-            blocks: [{
+            children: [{
+                type: "block",
                 content: "Parent",
                 children: [{
-                    id: "b_existing",
-                    content: "Child",
+                    id: "o_existing",
+                    type: "object",
+                    name: "Child",
                     properties: { done: false },
                     children: [],
                 }],
@@ -20,13 +22,15 @@ describe("CLI JSON validation", () => {
         }))).toEqual({
             entity: "object",
             value: {
-                parentID: "d_parent",
+                type: "object",
                 name: "Example",
-                blocks: [{
+                children: [{
+                    type: "block",
                     content: "Parent",
                     children: [{
-                        id: "b_existing",
-                        content: "Child",
+                        id: "o_existing",
+                        type: "object",
+                        name: "Child",
                         properties: { done: false },
                         children: [],
                     }],
@@ -35,19 +39,41 @@ describe("CLI JSON validation", () => {
         });
     });
 
-    test("validates standalone block creation and replacement", () => {
-        expect(parseWriteInput('{"content":"New"}')).toEqual({
+    test("validates standalone block replacement with children", () => {
+        expect(parseWriteInput(JSON.stringify({
+            type: "block",
+            content: "New",
+            children: [],
+        }))).toEqual({
             entity: "block",
-            value: { content: "New" },
+            value: {
+                type: "block",
+                content: "New",
+                children: [],
+            },
         });
-        expect(parseWriteInput(
-            '{"id":"b_existing","content":"Updated","properties":{}}',
-        )).toEqual({
+        expect(parseWriteInput(JSON.stringify({
+            id: "b_existing",
+            type: "block",
+            content: "Updated",
+            properties: {},
+            children: [{
+                type: "block",
+                content: "Child",
+                children: [],
+            }],
+        }))).toEqual({
             entity: "block",
             value: {
                 id: "b_existing",
+                type: "block",
                 content: "Updated",
                 properties: {},
+                children: [{
+                    type: "block",
+                    content: "Child",
+                    children: [],
+                }],
             },
         });
     });
@@ -58,58 +84,64 @@ describe("CLI JSON validation", () => {
         expectJSONError("[]", "INVALID_OBJECT");
     });
 
-    test("rejects unknown fields and flat storage fields", () => {
+    test("rejects unknown fields and removed storage/public fields", () => {
         expectJSONError(
-            '{"content":"Block","type":"block"}',
-            "UNKNOWN_FIELD",
-        );
-        expectJSONError(JSON.stringify({
-            parentID: "d_parent",
-            name: "Flat",
-            blocks: [{
-                content: "Block",
-                parentBlockID: "b_parent",
-                position: 0,
-                children: [],
-            }],
-        }), "UNKNOWN_FIELD");
-    });
-
-    test("rejects invalid IDs, missing children, and duplicate explicit block IDs", () => {
-        expectJSONError(
-            '{"id":null,"content":"Block"}',
+            '{"type":"block","content":"Block"}',
             "INVALID_FIELD",
         );
         expectJSONError(JSON.stringify({
-            parentID: "o_invalid",
-            name: "Invalid parent",
-            blocks: [],
-        }), "INVALID_PARENT_ID");
-        expectJSONError(JSON.stringify({
+            type: "object",
             parentID: "d_parent",
+            name: "Old",
+            blocks: [],
+            children: [],
+        }), "UNKNOWN_FIELD");
+        expectJSONError(JSON.stringify({
+            type: "block",
+            content: "Flat",
+            parentBlockID: "b_parent",
+            position: 0,
+            children: [],
+        }), "UNKNOWN_FIELD");
+    });
+
+    test("rejects invalid IDs, missing children, and duplicate explicit entity IDs", () => {
+        expectJSONError(
+            '{"id":null,"type":"block","content":"Block","children":[]}',
+            "INVALID_FIELD",
+        );
+        expectJSONError(JSON.stringify({
+            id: "b_invalid",
+            type: "object",
+            name: "Invalid",
+            children: [],
+        }), "INVALID_ID");
+        expectJSONError(JSON.stringify({
+            type: "object",
             name: "Missing children",
-            blocks: [{ content: "Block" }],
         }), "INVALID_FIELD");
         expectJSONError(JSON.stringify({
-            parentID: "d_parent",
+            type: "object",
             name: "Duplicate",
-            blocks: [{
+            children: [{
                 id: "b_same",
+                type: "block",
                 content: "First",
                 children: [{
                     id: "b_same",
+                    type: "block",
                     content: "Second",
                     children: [],
                 }],
             }],
-        }), "DUPLICATE_BLOCK_ID");
+        }), "DUPLICATE_ENTITY_ID");
     });
 
-    test("rejects ambiguous write shapes", () => {
-        expectJSONError("{}", "INVALID_WRITE_SHAPE");
+    test("rejects invalid discriminators", () => {
+        expectJSONError("{}", "INVALID_FIELD");
         expectJSONError(
-            '{"content":"Block","blocks":[]}',
-            "INVALID_WRITE_SHAPE",
+            '{"type":"page","name":"Invalid","children":[]}',
+            "INVALID_ENTITY_TYPE",
         );
     });
 });

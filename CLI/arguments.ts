@@ -9,9 +9,9 @@ export type CLICommand =
         action: "create";
         entity: "object";
         database: string;
-        parentID: string;
         name: string;
         propertyValues: string[];
+        parentID?: string;
     }
     | {
         action: "create";
@@ -19,10 +19,11 @@ export type CLICommand =
         database: string;
         content: string;
         propertyValues: string[];
+        parentID?: string;
     }
     | { action: "write"; database: string }
     | { action: "read"; database: string; id: string }
-    | { action: "list"; database: string; id: string; objectID?: string }
+    | { action: "list"; database: string; id: string }
     | { action: "delete"; database: string; id: string }
     | { action: "search"; database: string; query: string; type?: SearchType };
 
@@ -35,7 +36,6 @@ const optionNames = new Set([
     "content",
     "database",
     "name",
-    "object",
     "parent",
     "property",
     "type",
@@ -80,28 +80,12 @@ export function parseCommand(argv: string[]): CLICommand {
         }
 
         case "list": {
-            requirePositionals(parsed, 2, "agentdb list ID --database PATH [--object o_ID]");
-            allowOptions(parsed, ["database", "object"]);
+            requirePositionals(parsed, 2, "agentdb list ID --database PATH");
+            allowOptions(parsed, ["database"]);
             const id = parsed.positionals[1]!;
-            const entity = inferEntityType(id);
-            const objectID = optionalSingleOption(parsed, "object");
+            inferEntityType(id);
 
-            if (objectID !== undefined) {
-                if (entity !== "block") {
-                    throw inputError(
-                        "INVALID_OPTION",
-                        "--object is only valid when listing a block",
-                    );
-                }
-                requireEntityType(objectID, "object", "INVALID_OBJECT_ID");
-            }
-
-            return {
-                action,
-                database,
-                id,
-                ...(objectID === undefined ? {} : { objectID }),
-            };
+            return { action, database, id };
         }
 
         case "delete": {
@@ -165,34 +149,30 @@ function parseCreate(parsed: ParsedArguments, database: string): CLICommand {
     const entity = parsed.positionals[1];
     switch (entity) {
         case "object": {
-            allowOptions(parsed, ["database", "parent", "name", "property"]);
-            const parentID = requireSingleOption(parsed, "parent");
-            const parentType = inferEntityType(parentID);
-            if (parentType !== "database") {
-                throw inputError(
-                    "INVALID_PARENT_ID",
-                    `Parent must be a database ID: ${parentID}`,
-                );
-            }
+            allowOptions(parsed, ["database", "name", "parent", "property"]);
+            const parentID = optionalCreateParentID(parsed, entity);
             return {
                 action: "create",
                 entity,
                 database,
-                parentID,
                 name: requireSingleOption(parsed, "name"),
                 propertyValues: parsed.options.get("property") ?? [],
+                ...(parentID === undefined ? {} : { parentID }),
             };
         }
 
-        case "block":
-            allowOptions(parsed, ["database", "content", "property"]);
+        case "block": {
+            allowOptions(parsed, ["database", "content", "parent", "property"]);
+            const parentID = optionalCreateParentID(parsed, entity);
             return {
                 action: "create",
                 entity,
                 database,
                 content: requireSingleOption(parsed, "content"),
                 propertyValues: parsed.options.get("property") ?? [],
+                ...(parentID === undefined ? {} : { parentID }),
             };
+        }
 
         default:
             throw inputError(
@@ -277,6 +257,22 @@ function optionalSingleOption(parsed: ParsedArguments, name: string): string | u
         throw inputError("DUPLICATE_OPTION", `Option --${name} may only be specified once`);
     }
     return values[0]!;
+}
+
+function optionalCreateParentID(
+    parsed: ParsedArguments,
+    childType: Exclude<EntityType, "database">,
+): string | undefined {
+    const parentID = optionalSingleOption(parsed, "parent");
+    if (parentID === undefined) {
+        return undefined;
+    }
+
+    const parentType = inferEntityType(parentID);
+    if (childType === "block" && parentType === "database") {
+        throw inputError("INVALID_PARENT", `Database parents can only contain objects: ${parentID}`);
+    }
+    return parentID;
 }
 
 function requireEntityType(id: string, expected: EntityType, code = "INVALID_ID"): void {

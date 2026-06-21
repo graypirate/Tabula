@@ -9,7 +9,7 @@ import {
     initDatabase,
     openDatabase,
     SchemaVersion,
-} from "../../core/db/init";
+} from "../../core/storage/db/init";
 
 let db: Database | undefined;
 let tempDirectory: string | undefined;
@@ -30,6 +30,9 @@ test("initDatabase creates one database metadata row with an optional name", () 
     expect(unnamed.name).toBeUndefined();
     expect(unnamed.schemaVersion).toBe(SchemaVersion);
     expect(db.query('SELECT COUNT(*) AS count FROM "database"').get()).toEqual({ count: 1 });
+    expect(db.query("SELECT id, type FROM entities").all()).toEqual([
+        { id: unnamed.id, type: "database" },
+    ]);
     expect(() => db!.query(`
         INSERT INTO "database" (id, name, schema_version)
         VALUES ('d_second', NULL, '0.1.0')

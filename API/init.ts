@@ -1,14 +1,14 @@
 import type { Database } from "bun:sqlite";
 
 import {
-    initDatabase,
-    openDatabase as openStoredDatabase,
-} from "../core/db/init";
+    initializeDatabaseStorage,
+    openDatabaseStorage,
+} from "../core/storage";
 
 export function initializeDatabase(path: string, name?: string): Database {
-    return initDatabase(path, name);
+    return initializeDatabaseStorage(path, name);
 }
 
 export function openDatabase(path: string): Database {
-    return openStoredDatabase(path);
+    return openDatabaseStorage(path);
 }

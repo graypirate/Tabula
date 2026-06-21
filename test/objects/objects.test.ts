@@ -1,25 +1,23 @@
 import { afterEach, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 
+import { insertStoredBlock, isStoredBlock } from "../../core/storage/db/blocks";
 import {
-    getStoredBlock,
-    getBlockPlacements,
-    insertStoredBlock,
-    insertStoredBlocks,
-    insertBlockPlacements,
-    isStoredBlock,
-} from "../../core/db/blocks";
-import { getDatabaseMetadata, initDatabase } from "../../core/db/init";
+    appendDatabaseRootObject,
+    getDatabaseRootObjects,
+    readStoredObjectTree,
+    replaceEntityChildren,
+} from "../../core/storage/db/entities";
+import { getDatabaseMetadata, initDatabase } from "../../core/storage/db/init";
 import {
     deleteStoredObject,
-    getStoredObject,
     getObjectMetadata,
+    getStoredObject,
     insertStoredObject,
     isStoredObject,
-    updateStoredObject,
     updateObjectMetadata,
-} from "../../core/db/objects";
-import type { StoredObject, StoredObjectBlock } from "../../core/db/types";
+    updateStoredObject,
+} from "../../core/storage/db/objects";
 
 let db: Database | undefined;
 
@@ -28,217 +26,132 @@ afterEach(() => {
     db = undefined;
 });
 
-test("object operations persist caller IDs under database parents", () => {
+test("object operations persist caller IDs and metadata", () => {
     db = initDatabase(":memory:", "Test Database");
-    const databaseID = getDatabaseMetadata(db).id;
 
     insertStoredObject(db, {
         id: "o_root",
-        parentID: databaseID,
+        type: "object",
         name: "Root Object",
-        properties: {
-            scope: "database",
-        },
+        properties: { scope: "database" },
     });
 
     expect(getObjectMetadata(db, "o_root")).toEqual({
         id: "o_root",
-        parentID: databaseID,
+        type: "object",
         name: "Root Object",
-        properties: {
-            scope: "database",
-        },
+        properties: { scope: "database" },
     });
+    expect(getStoredObject(db, "o_root")).toEqual(getObjectMetadata(db, "o_root"));
     expect(isStoredObject(db, "o_root")).toBe(true);
     expect(() => insertStoredObject(db!, {
         id: "o_root",
-        parentID: databaseID,
+        type: "object",
         name: "Duplicate",
-    })).toThrow("Object already exists");
-    expect(() => insertStoredObject(db!, {
-        id: "o_missing_parent",
-        parentID: "x_missing",
-        name: "Missing Parent",
-    })).toThrow("Object parent must be a database");
-    expect(() => insertStoredObject(db!, {
-        id: "o_missing_database",
-        parentID: "d_missing",
-        name: "Missing Database",
-    })).toThrow("Database parent not found");
+    })).toThrow("Entity already exists");
 
     updateObjectMetadata(db, {
         id: "o_root",
-        parentID: databaseID,
-        name: "Moved Object",
-        properties: {
-            scope: "updated",
-        },
+        type: "object",
+        name: "Updated Object",
+        properties: { scope: "updated" },
     });
     expect(getObjectMetadata(db, "o_root")).toEqual({
         id: "o_root",
-        parentID: databaseID,
-        name: "Moved Object",
-        properties: {
-            scope: "updated",
-        },
+        type: "object",
+        name: "Updated Object",
+        properties: { scope: "updated" },
     });
 });
 
-test("empty objects compile with no blocks", () => {
+test("database roots are stored as object containment edges", () => {
     db = initDatabase(":memory:");
     const databaseID = getDatabaseMetadata(db).id;
 
-    insertStoredObject(db, {
-        id: "o_empty",
-        parentID: databaseID,
-        name: "Empty",
-    });
+    insertStoredObject(db, { id: "o_first", type: "object", name: "First" });
+    insertStoredObject(db, { id: "o_second", type: "object", name: "Second" });
 
-    expect(getStoredObject(db, "o_empty")).toEqual({
-        id: "o_empty",
-        parentID: databaseID,
-        name: "Empty",
+    appendDatabaseRootObject(db, databaseID, "o_first");
+    appendDatabaseRootObject(db, databaseID, "o_second");
+    appendDatabaseRootObject(db, databaseID, "o_first");
+
+    expect(getDatabaseRootObjects(db, databaseID)).toEqual(["o_first", "o_second"]);
+});
+
+test("objects read recursive mixed children through entity containment", () => {
+    db = initDatabase(":memory:");
+    insertStoredObject(db, { id: "o_root", type: "object", name: "Root" });
+    insertStoredObject(db, { id: "o_nested", type: "object", name: "Nested" });
+    insertStoredBlock(db, {
+        id: "b_parent",
+        type: "block",
+        content: "Parent",
+    });
+    replaceEntityChildren(db, new Map([
+        ["o_root", [{ type: "block", id: "b_parent" }]],
+        ["b_parent", [{ type: "object", id: "o_nested" }]],
+    ]));
+
+    expect(readStoredObjectTree(db, "o_root")).toEqual({
+        id: "o_root",
+        type: "object",
+        name: "Root",
         properties: {},
-        blocks: [],
+        children: [{
+            id: "b_parent",
+            type: "block",
+            content: "Parent",
+            properties: {},
+            children: [{
+                id: "o_nested",
+                type: "object",
+                name: "Nested",
+                properties: {},
+                children: [],
+            }],
+        }],
     });
 });
 
-test("getStoredObject compiles nested placements in depth-first preorder", () => {
+test("deleteStoredObject removes the object subtree", () => {
     db = initDatabase(":memory:");
-    const databaseID = getDatabaseMetadata(db).id;
-
-    insertStoredObject(db, {
-        id: "o_tree",
-        parentID: databaseID,
-        name: "Tree",
+    insertStoredObject(db, { id: "o_root", type: "object", name: "Root" });
+    insertStoredBlock(db, {
+        id: "b_child",
+        type: "block",
+        content: "Child",
     });
-    insertStoredBlocks(db, [
-        block("b_child_two", "Child two"),
-        block("b_second", "Second"),
-        block("b_grandchild", "Grandchild"),
-        block("b_parent", "Parent"),
-        block("b_child_one", "Child one"),
-    ]);
-    insertBlockPlacements(db, "o_tree", [
-        placement("b_child_two", "b_parent", 1),
-        placement("b_second", undefined, 1),
-        placement("b_grandchild", "b_child_one", 0),
-        placement("b_parent", undefined, 0),
-        placement("b_child_one", "b_parent", 0),
-    ]);
+    replaceEntityChildren(db, new Map([
+        ["o_root", [{ type: "block", id: "b_child" }]],
+    ]));
 
-    const object = getStoredObject(db, "o_tree");
-    expect(object.blocks.map((item) => item.id)).toEqual([
-        "b_parent",
-        "b_child_one",
-        "b_grandchild",
-        "b_child_two",
-        "b_second",
-    ]);
-    expect(object.blocks.map((item) => item.parentBlockID)).toEqual([
-        undefined,
-        "b_parent",
-        "b_child_one",
-        "b_parent",
-        undefined,
-    ]);
+    expect(deleteStoredObject(db, "o_root")).toBe(true);
+    expect(deleteStoredObject(db, "o_root")).toBe(false);
+    expect(isStoredObject(db, "o_root")).toBe(false);
+    expect(isStoredBlock(db, "b_child")).toBe(false);
 });
 
-test("updateStoredObject synchronizes placements and globally updates shared blocks", () => {
+test("updateStoredObject updates metadata without changing children", () => {
     db = initDatabase(":memory:");
-    const databaseID = getDatabaseMetadata(db).id;
-
-    insertStoredObject(db, {
-        id: "o_update",
-        parentID: databaseID,
-        name: "Original",
+    insertStoredObject(db, { id: "o_root", type: "object", name: "Root" });
+    insertStoredBlock(db, {
+        id: "b_child",
+        type: "block",
+        content: "Child",
     });
-    insertStoredObject(db, {
-        id: "o_shared",
-        parentID: databaseID,
-        name: "Shared",
-    });
-    insertStoredBlocks(db, [
-        block("b_keep", "Keep"),
-        block("b_remove", "Remove"),
-        block("b_remove_child", "Remove child"),
-    ]);
-    insertBlockPlacements(db, "o_update", [
-        placement("b_keep", undefined, 0),
-        placement("b_remove", undefined, 1),
-        placement("b_remove_child", "b_remove", 0),
-    ]);
-    insertBlockPlacements(db, "o_shared", [
-        placement("b_keep", undefined, 0),
-    ]);
+    replaceEntityChildren(db, new Map([
+        ["o_root", [{ type: "block", id: "b_child" }]],
+    ]));
 
-    const desired: StoredObject = {
-        id: "o_update",
-        parentID: databaseID,
+    updateStoredObject(db, {
+        id: "o_root",
+        type: "object",
         name: "Updated",
-        properties: {
-            status: "done",
-        },
-        blocks: [
-            objectBlock("b_new_child", "New child", "b_keep", 0),
-            objectBlock("b_new", "New", undefined, 1),
-            objectBlock("b_keep", "Keep updated", undefined, 0),
-        ],
-    };
-
-    updateStoredObject(db, desired);
-    const updated = getStoredObject(db, "o_update");
-    expect(updated.name).toBe("Updated");
-    expect(updated.properties).toEqual({ status: "done" });
-    expect(updated.blocks.map((item) => item.id)).toEqual([
-        "b_keep",
-        "b_new_child",
-        "b_new",
-    ]);
-    expect(updated.blocks[0]?.content).toBe("Keep updated");
-    expect(getStoredObject(db, "o_shared").blocks[0]?.content).toBe("Keep updated");
-    expect(getStoredBlock(db, "b_remove").content).toBe("Remove");
-    expect(getStoredBlock(db, "b_remove_child").content).toBe("Remove child");
-    expect(getBlockPlacements(db, "o_update").some((item) => item.id === "b_remove")).toBe(false);
-    expect(isStoredBlock(db, "b_new")).toBe(true);
-
-    updateObjectMetadata(db, {
-        id: "o_update",
-        parentID: databaseID,
-        name: "Metadata Only",
+        properties: { done: true },
     });
-    expect(getStoredObject(db, "o_update").blocks).toHaveLength(3);
+
+    const object = readStoredObjectTree(db, "o_root");
+    expect(object.name).toBe("Updated");
+    expect(object.properties).toEqual({ done: true });
+    expect(object.children.map((child) => child.id)).toEqual(["b_child"]);
 });
-
-test("deleteStoredObject removes only its placements and preserves canonical blocks", () => {
-    db = initDatabase(":memory:");
-    const databaseID = getDatabaseMetadata(db).id;
-
-    insertStoredObject(db, { id: "o_one", parentID: databaseID, name: "One" });
-    insertStoredObject(db, { id: "o_two", parentID: databaseID, name: "Two" });
-    insertStoredBlock(db, block("b_shared", "Shared"));
-    insertBlockPlacements(db, "o_one", [placement("b_shared", undefined, 0)]);
-    insertBlockPlacements(db, "o_two", [placement("b_shared", undefined, 0)]);
-
-    expect(deleteStoredObject(db, "o_one")).toBe(true);
-    expect(deleteStoredObject(db, "o_one")).toBe(false);
-    expect(isStoredBlock(db, "b_shared")).toBe(true);
-    expect(getStoredObject(db, "o_two").blocks.map((item) => item.id)).toEqual(["b_shared"]);
-    expect(db.query(`
-        SELECT COUNT(*) AS count
-        FROM object_blocks
-        WHERE object_id = 'o_one'
-    `).get()).toEqual({ count: 0 });
-});
-
-function block(id: string, content: string) {
-    return { id, content };
-}
-
-function placement(id: string, parentBlockID: string | undefined, position: number) {
-    return { id, parentBlockID, position };
-}
-
-function objectBlock(id: string, content: string, parentBlockID: string | undefined, position: number): StoredObjectBlock {
-    return { id, content, parentBlockID, position };
-}

@@ -1,122 +1,154 @@
 import type { Database } from "bun:sqlite";
 
-import { getBlockMetadata, getBlockPlacements, getStoredBlock } from "../core/db/blocks";
-import { getDatabaseMetadata } from "../core/db/init";
-import { getObjectMetadata, getStoredObject } from "../core/db/objects";
+import {
+    readDatabaseMetadata,
+    readDatabaseRootObjects,
+    listEntity as listStoredEntity,
+    readEntityParentID,
+    readEntityTree,
+} from "../core/storage";
 import type { Block, BlockID, BlockMetadata } from "../core/types/block";
 import type { DBMetadata } from "../core/types/database";
+import type { Entity } from "../core/types/entity";
 import type { Obj, ObjID, ObjMetadata } from "../core/types/object";
-import { expandStoredObject } from "./types";
-
-// MARK: List interfaces
+import {
+    type BlockList,
+    type BlockResult,
+    type EntityList,
+    type EntityResult,
+    type ObjectList,
+    type ObjectResult,
+} from "./types";
 
 export interface DatabaseList {
+    parentID: null;
     metadata: DBMetadata;
     objects: ObjID[];
 }
 
-export interface ObjectList {
-    metadata: ObjMetadata;
-    blocks: BlockID[];
-}
-
-export interface BlockList {
-    metadata: BlockMetadata;
-    objectID?: ObjID;
-    ancestors?: BlockID[];
-    children?: BlockID[];
-}
-
-// MARK: Read functions return a full physical entity
-
+/**
+ * Reads database metadata.
+ * @param db - The database to read
+ * @returns The database metadata
+ */
 export function readDatabase(db: Database): DBMetadata {
-    return getDatabaseMetadata(db);
+    return readDatabaseMetadata(db);
 }
 
-export function readObject(db: Database, objectID: ObjID): Obj {
-    return expandStoredObject(getStoredObject(db, objectID));
+/**
+ * Reads an object or block as a parent-aware recursive entity result.
+ * @param db - The database containing the entity
+ * @param entityID - The object or block ID to read
+ * @returns The parent-aware recursive entity result
+ */
+export function readEntity(db: Database, entityID: string): EntityResult {
+    return entityResult(db, readEntityTree(db, entityID));
 }
 
-export function readBlock(db: Database, blockID: BlockID): Block {
-    return getStoredBlock(db, blockID);
+/**
+ * Reads an object as a recursive entity tree.
+ * @param db - The database containing the object
+ * @param objectID - The object ID to read
+ * @returns The recursive object
+ */
+export function readObject(db: Database, objectID: ObjID): ObjectResult {
+    const result = readEntity(db, objectID);
+    assertObjectResult(result);
+    return result;
 }
 
-// MARK: List functions return a high-level view of the entity
+/**
+ * Reads a block as a recursive entity tree.
+ * @param db - The database containing the block
+ * @param blockID - The block ID to read
+ * @returns The recursive block
+ */
+export function readBlock(db: Database, blockID: BlockID): BlockResult {
+    const result = readEntity(db, blockID);
+    assertBlockResult(result);
+    return result;
+}
 
+/**
+ * Lists database metadata and root object IDs.
+ * @param db - The database to list
+ * @returns The database list view
+ */
 export function listDatabase(db: Database): DatabaseList {
-    const metadata = getDatabaseMetadata(db);
+    const metadata = readDatabaseMetadata(db);
     return {
+        parentID: null,
         metadata,
-        objects: readDatabaseObjects(db, metadata.id),
+        objects: readDatabaseRootObjects(db),
     };
 }
 
+/**
+ * Lists object or block metadata and direct child entity references.
+ * @param db - The database containing the entity
+ * @param entityID - The object or block ID to list
+ * @returns The parent-aware entity list view
+ */
+export function listEntity(db: Database, entityID: string): EntityList {
+    const result = listStoredEntity(db, entityID);
+    return {
+        parentID: result.parentID,
+        metadata: result.metadata,
+        children: result.children,
+    };
+}
+
+/**
+ * Lists object metadata and direct child entity references.
+ * @param db - The database containing the object
+ * @param objectID - The object ID to list
+ * @returns The object list view
+ */
 export function listObject(db: Database, objectID: ObjID): ObjectList {
-    const rows = db.query(`
-        SELECT block_id AS id
-        FROM object_blocks
-        WHERE object_id = $objectID
-          AND parent_block_id IS NULL
-        ORDER BY position
-    `).all({ $objectID: objectID }) as { id: BlockID }[];
+    const result = listEntity(db, objectID);
+    assertObjectList(result);
+    return result;
+}
 
+/**
+ * Lists block metadata and direct child entity references.
+ * @param db - The database containing the block
+ * @param blockID - The block ID to list
+ * @returns The block list view
+ */
+export function listBlock(db: Database, blockID: BlockID): BlockList {
+    const result = listEntity(db, blockID);
+    assertBlockList(result);
+    return result;
+}
+
+function entityResult<T extends Entity>(db: Database, entity: T): EntityResult<T> {
     return {
-        metadata: getObjectMetadata(db, objectID),
-        blocks: rows.map((row) => row.id),
+        parentID: readEntityParentID(db, entity.id),
+        entity,
     };
 }
 
-/* Listing a block can refer to the canonical entity or its placement within an object */
-export function listBlock(
-    db: Database,
-    blockID: BlockID,
-    objectID?: ObjID,
-): BlockList {
-    const result: BlockList = {
-        metadata: getBlockMetadata(db, blockID),
-    };
-    if (objectID === undefined) {
-        return result;
+function assertObjectResult(result: EntityResult): asserts result is ObjectResult {
+    if (result.entity.type !== "object") {
+        throw new Error("Expected object result");
     }
-
-    const blocks = getBlockPlacements(db, objectID);
-    const byID = new Map(blocks.map((block) => [block.id, block]));
-    const target = byID.get(blockID);
-    if (!target) {
-        throw new Error(`Block ${blockID} is not placed in object ${objectID}`);
-    }
-
-    const ancestors: BlockID[] = [];
-    let parentID = target.parentBlockID;
-    while (parentID !== undefined) {
-        ancestors.push(parentID);
-        parentID = byID.get(parentID)?.parentBlockID;
-    }
-    ancestors.reverse();
-
-    return {
-        ...result,
-        objectID,
-        ancestors,
-        children: blocks
-            .filter((block) => block.parentBlockID === blockID)
-            .map((block) => block.id),
-    };
 }
 
-// MARK: Helper functions
+function assertBlockResult(result: EntityResult): asserts result is BlockResult {
+    if (result.entity.type !== "block") {
+        throw new Error("Expected block result");
+    }
+}
 
-/** Reads the direct objects parented by a database. */
-function readDatabaseObjects(
-    db: Database,
-    parentID: string,
-): ObjID[] {
-    const objects = db.query(`
-        SELECT id
-        FROM objects
-        WHERE parent_id = $parentID
-        ORDER BY name, id
-    `).all({ $parentID: parentID }) as { id: ObjID }[];
+function assertObjectList(result: EntityList): asserts result is ObjectList {
+    if (result.metadata.type !== "object") {
+        throw new Error("Expected object list");
+    }
+}
 
-    return objects.map((row) => row.id);
+function assertBlockList(result: EntityList): asserts result is BlockList {
+    if (result.metadata.type !== "block") {
+        throw new Error("Expected block list");
+    }
 }

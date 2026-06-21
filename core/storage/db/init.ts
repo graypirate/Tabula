@@ -1,10 +1,10 @@
 import { Database } from "bun:sqlite";
 
-import type { DBMetadata } from "../types/database";
-import { createDatabaseID } from "../utils/id";
+import type { DBMetadata } from "../../types/database";
+import { createDatabaseID } from "../../utils/id";
 import schema from "./schema.sql" with { type: "text" };
 
-export const SchemaVersion = "0.1.0";
+export const SchemaVersion = "0.2.0";
 
 type DatabaseRow = {
     id: string;
@@ -34,14 +34,23 @@ export function initDatabase(path: string, name?: string): Database {
         db.exec(schema);
 
         if (isFresh) {
-            db.query(`
-                INSERT INTO "database" (id, name, schema_version)
-                VALUES ($id, $name, $schemaVersion)
-            `).run({
-                $id: createDatabaseID(),
-                $name: name ?? null,
-                $schemaVersion: SchemaVersion,
+            const insertMetadata = db.transaction(() => {
+                const databaseID = createDatabaseID();
+                db.query(`
+                    INSERT INTO entities (id, type)
+                    VALUES ($id, 'database')
+                `).run({ $id: databaseID });
+                db.query(`
+                    INSERT INTO "database" (id, name, schema_version)
+                    VALUES ($id, $name, $schemaVersion)
+                `).run({
+                    $id: databaseID,
+                    $name: name ?? null,
+                    $schemaVersion: SchemaVersion,
+                });
             });
+
+            insertMetadata();
         }
     } catch (error) {
         db.close();

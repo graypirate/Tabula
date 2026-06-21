@@ -13,8 +13,6 @@ describe("CLI argument parsing", () => {
             "object",
             "--database",
             "agent.db",
-            "--parent",
-            "d_parent",
             "--name",
             "Example",
             "--property",
@@ -25,7 +23,6 @@ describe("CLI argument parsing", () => {
             action: "create",
             entity: "object",
             database: "agent.db",
-            parentID: "d_parent",
             name: "Example",
             propertyValues: ["count=2", "note=plain text"],
         });
@@ -35,12 +32,14 @@ describe("CLI argument parsing", () => {
             "block",
             "--database=agent.db",
             "--content=Example",
+            "--parent=o_parent",
         ])).toEqual({
             action: "create",
             entity: "block",
             database: "agent.db",
             content: "Example",
             propertyValues: [],
+            parentID: "o_parent",
         });
     });
 
@@ -51,19 +50,16 @@ describe("CLI argument parsing", () => {
         });
     });
 
-    test("parses entity commands and contextual block lists", () => {
+    test("parses entity commands and search filters", () => {
         expect(parseCommand([
             "list",
             "b_example",
             "--database",
             "agent.db",
-            "--object",
-            "o_example",
         ])).toEqual({
             action: "list",
             database: "agent.db",
             id: "b_example",
-            objectID: "o_example",
         });
 
         expect(parseCommand([
@@ -99,12 +95,23 @@ describe("CLI argument parsing", () => {
                 "folder",
                 "--database",
                 "agent.db",
-                "--parent",
-                "d_parent",
                 "--name",
                 "Invalid",
             ]),
             "INVALID_ENTITY_TYPE",
+        );
+        expectInputError(
+            () => parseCommand([
+                "create",
+                "block",
+                "--database",
+                "agent.db",
+                "--content",
+                "Invalid",
+                "--parent",
+                "d_parent",
+            ]),
+            "INVALID_PARENT",
         );
         expectInputError(
             () => parseCommand([
@@ -115,7 +122,7 @@ describe("CLI argument parsing", () => {
                 "--object",
                 "o_other",
             ]),
-            "INVALID_OPTION",
+            "UNKNOWN_OPTION",
         );
         expectInputError(
             () => parseCommand(["read", "o_example", "-d", "agent.db"]),
@@ -129,19 +136,6 @@ describe("CLI argument parsing", () => {
 
     test("requires the database and validates search and deletion targets", () => {
         expectInputError(() => parseCommand(["read", "o_example"]), "MISSING_OPTION");
-        expectInputError(
-            () => parseCommand([
-                "create",
-                "object",
-                "--database",
-                "agent.db",
-                "--parent",
-                "o_invalid",
-                "--name",
-                "Invalid",
-            ]),
-            "INVALID_PARENT_ID",
-        );
         expectInputError(
             () => parseCommand([
                 "search",

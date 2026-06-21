@@ -1,20 +1,15 @@
 import {
-    createBlock,
-    createObject,
-    deleteBlock,
-    deleteObject,
+    createEntity,
+    deleteEntity as deleteAPIEntity,
     initializeDatabase,
-    listBlock,
     listDatabase,
-    listObject,
+    listEntity as listAPIEntity,
     openDatabase,
-    readBlock,
     readDatabase,
-    readObject,
+    readEntity as readAPIEntity,
     search,
-    writeBlock,
-    writeObject,
-} from "../API/index.ts";
+    writeEntity,
+} from "../index.ts";
 import { inferEntityType, type CLICommand } from "./arguments.ts";
 import { CLIInputError, CLIOperationError } from "./errors.ts";
 import type { WriteInput } from "./json.ts";
@@ -45,29 +40,30 @@ export function dispatchCommand(command: CLICommand, writeInput?: WriteInput): u
             case "create": {
                 switch (command.entity) {
                     case "object":
-                        return createObject(
-                            db,
-                            command.parentID,
-                            command.name,
+                        return createEntity(db, {
+                            type: "object",
+                            name: command.name,
                             properties,
-                        );
+                        }, createOptions(command.parentID));
                     case "block":
-                        return createBlock(db, command.content, properties);
+                        return createEntity(db, {
+                            type: "block",
+                            content: command.content,
+                            properties,
+                        }, createOptions(command.parentID));
                 }
             }
             case "write":
                 if (writeInput === undefined) {
                     throw new Error("Validated write input is required");
                 }
-                return writeInput.entity === "object"
-                    ? writeObject(db, writeInput.value)
-                    : writeBlock(db, writeInput.value);
+                return writeEntity(db, writeInput.value);
             case "read":
-                return readEntity(db, command.id);
+                return readCommandEntity(db, command.id);
             case "list":
-                return listEntity(db, command.id, command.objectID);
+                return listCommandEntity(db, command.id);
             case "delete":
-                return deleteEntity(db, command.id);
+                return deleteCommandEntity(db, command.id);
             case "search":
                 return search(db, command.query, command.type);
         }
@@ -100,30 +96,28 @@ function withInitializedDatabase(
     }
 }
 
-function readEntity(db: Database, id: string): unknown {
+function readCommandEntity(db: Database, id: string): unknown {
     switch (inferEntityType(id)) {
         case "database":
             return readMatchingDatabase(db, id);
         case "object":
-            return readObject(db, id);
         case "block":
-            return readBlock(db, id);
+            return readAPIEntity(db, id);
     }
 }
 
-function listEntity(db: Database, id: string, objectID?: string): unknown {
+function listCommandEntity(db: Database, id: string): unknown {
     switch (inferEntityType(id)) {
         case "database":
             readMatchingDatabase(db, id);
             return listDatabase(db);
         case "object":
-            return listObject(db, id);
         case "block":
-            return listBlock(db, id, objectID);
+            return listAPIEntity(db, id);
     }
 }
 
-function deleteEntity(db: Database, id: string): boolean {
+function deleteCommandEntity(db: Database, id: string): boolean {
     switch (inferEntityType(id)) {
         case "database":
             throw new CLIOperationError(
@@ -131,10 +125,13 @@ function deleteEntity(db: Database, id: string): boolean {
                 "Database deletion is not supported",
             );
         case "object":
-            return deleteObject(db, id);
         case "block":
-            return deleteBlock(db, id);
+            return deleteAPIEntity(db, id);
     }
+}
+
+function createOptions(parentID: string | undefined): { parentID?: string } {
+    return parentID === undefined ? {} : { parentID };
 }
 
 function readMatchingDatabase(db: Database, id: string): ReturnType<typeof readDatabase> {

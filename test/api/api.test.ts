@@ -6,18 +6,24 @@ import { join } from "node:path";
 
 import {
     createBlock,
+    createEntity,
     createObject,
+    deleteBlock,
+    deleteEntity,
     deleteObject,
     initializeDatabase,
     listBlock,
     listDatabase,
+    listEntity,
     listObject,
     openDatabase,
     readBlock,
     readDatabase,
+    readEntity,
     readObject,
     search,
     writeBlock,
+    writeEntity,
     writeObject,
 } from "../../API";
 import type { ObjectWrite } from "../../API";
@@ -51,208 +57,272 @@ test("initializes and opens an existing database", () => {
     expect(readDatabase(db)).toEqual(metadata);
 });
 
-test("quick create functions generate IDs and return public domain types", () => {
+test("quick create functions return recursive public entities", () => {
     db = initializeDatabase(":memory:");
-    const databaseID = readDatabase(db).id;
-    const object = createObject(db, databaseID, "AgentDB", { active: true });
-    const block = createBlock(db, "Standalone", { kind: "text" });
+    const objectResult = createObject(db, "AgentDB", { active: true });
+    const blockResult = createBlock(db, "Standalone", { kind: "text" });
+    const object = objectResult.entity;
+    const block = blockResult.entity;
 
+    expect(objectResult.parentID).toBe(readDatabase(db).id);
+    expect(blockResult.parentID).toBeNull();
     expect(object).toEqual({
         id: expect.stringMatching(/^o_/),
-        parentID: databaseID,
+        type: "object",
         name: "AgentDB",
         properties: { active: true },
-        blocks: [],
+        children: [],
     });
     expect(block).toEqual({
         id: expect.stringMatching(/^b_/),
+        type: "block",
         content: "Standalone",
         properties: { kind: "text" },
+        children: [],
     });
-    expect(readObject(db, object.id)).toEqual(object);
-    expect(readBlock(db, block.id)).toEqual(block);
+    expect(readObject(db, object.id).entity).toEqual(object);
+    expect(readBlock(db, block.id).entity).toEqual(block);
+    expect(listDatabase(db).objects).toEqual([object.id]);
 });
 
-test("writeBlock creates without an ID and updates with an ID", () => {
+test("generic create can attach entities to a parent", () => {
     db = initializeDatabase(":memory:");
-
-    const created = writeBlock(db, {
-        content: "Created",
-        properties: { version: 1 },
-    });
-    const updated = writeBlock(db, {
-        id: created.id,
-        content: "Updated",
+    const object = createEntity(db, {
+        type: "object",
+        name: "Parent",
         properties: {},
-    });
-
-    expect(created.id).toStartWith("b_");
-    expect(updated).toEqual({
-        id: created.id,
-        content: "Updated",
+    }).entity;
+    const child = createEntity(db, {
+        type: "block",
+        content: "Child",
         properties: {},
-    });
-    expect(readBlock(db, created.id)).toEqual(updated);
+    }, { parentID: object.id });
+
+    expect(child.parentID).toBe(object.id);
+    expect(listEntity(db, object.id).children).toEqual([{ type: "block", id: child.entity.id }]);
 });
 
-test("writeObject creates and returns a complete recursive object", () => {
+test("writeObject creates a mixed recursive entity tree", () => {
     db = initializeDatabase(":memory:");
-    const databaseID = readDatabase(db).id;
 
     const object = writeObject(db, {
-        parentID: databaseID,
-        name: "Tree",
+        type: "object",
+        name: "Root",
         properties: { status: "active" },
-        blocks: [{
-            content: "Parent",
+        children: [{
+            type: "block",
+            content: "Parent block",
             properties: {},
             children: [{
-                content: "Child",
+                type: "object",
+                name: "Nested object",
                 properties: { level: 1 },
                 children: [{
-                    content: "Grandchild",
+                    type: "block",
+                    content: "Nested block",
                     properties: {},
                     children: [],
                 }],
             }],
         }, {
-            content: "Second",
+            type: "block",
+            content: "Second block",
             properties: {},
             children: [],
         }],
-    });
+    }).entity;
 
     expect(object.id).toStartWith("o_");
-    expect(object.blocks).toHaveLength(2);
-    expect(object.blocks.map((block) => block.content)).toEqual(["Parent", "Second"]);
-    expect(object.blocks[0]?.children[0]?.content).toBe("Child");
-    expect(object.blocks[0]?.children[0]?.children[0]?.content).toBe("Grandchild");
-    expect(object.blocks[0]?.id).toStartWith("b_");
-    expect(object.blocks[0]?.children[0]?.id).toStartWith("b_");
-    expect(readObject(db, object.id)).toEqual(object);
+    expect(object.children.map((child) => child.type)).toEqual(["block", "block"]);
+    expect(object.children[0]?.children[0]?.type).toBe("object");
+    expect(object.children[0]?.children[0]?.children[0]?.type).toBe("block");
+    expect(readObject(db, object.id).entity).toEqual(object);
 });
 
-test("readObject output can be written back without changing its shape", () => {
+test("read output can be written back without changing shape", () => {
     db = initializeDatabase(":memory:");
-    const databaseID = readDatabase(db).id;
-    const created = writeObject(db, {
-        parentID: databaseID,
-        name: "Round trip",
-        properties: { version: 1 },
-        blocks: [{
-            content: "First",
-            properties: {},
-            children: [{
-                content: "Nested",
-                properties: { depth: 1 },
-                children: [],
-            }],
-        }, {
-            content: "Second",
-            properties: {},
-            children: [],
-        }],
-    });
+    const created = writeObject(db, objectWrite("Round trip")).entity;
 
-    expect(writeObject(db, created)).toEqual(created);
-    expect(readObject(db, created.id)).toEqual(created);
+    expect(writeObject(db, created).entity).toEqual(created);
+    expect(readObject(db, created.id).entity).toEqual(created);
 });
 
-test("writeObject completely replaces placements and globally updates reused blocks", () => {
+test("replacement writes detach omitted subtrees without deleting them", () => {
     db = initializeDatabase(":memory:");
-    const databaseID = readDatabase(db).id;
-    const shared = createBlock(db, "Shared");
-    const first = writeObject(db, objectWrite(databaseID, "First", shared.id));
-    const second = writeObject(db, objectWrite(databaseID, "Second", shared.id));
-    const omitted = first.blocks[0]!.children[0]!;
+    const created = writeObject(db, objectWrite("Original")).entity;
+    const omittedBlock = created.children[0]!;
+    const omittedObject = omittedBlock.children[0]!;
 
     const replaced = writeObject(db, {
-        id: first.id,
-        parentID: databaseID,
-        name: "First updated",
+        id: created.id,
+        type: "object",
+        name: "Updated",
         properties: {},
-        blocks: [{
-            id: shared.id,
-            content: "Shared globally updated",
+        children: [],
+    }).entity;
+
+    expect(replaced.children).toEqual([]);
+    expect(readBlock(db, omittedBlock.id).entity.children.map((child) => child.id)).toEqual([omittedObject.id]);
+    expect(omittedObject.type).toBe("object");
+    if (omittedObject.type !== "object") {
+        throw new Error("Expected omitted child to be an object");
+    }
+    expect(readObject(db, omittedObject.id).entity).toEqual(omittedObject);
+});
+
+test("explicit IDs move existing entities into the submitted tree", () => {
+    db = initializeDatabase(":memory:");
+    const first = writeObject(db, objectWrite("First")).entity;
+    const moved = first.children[0]!;
+    const second = writeObject(db, {
+        type: "object",
+        name: "Second",
+        properties: {},
+        children: [{
+            id: moved.id,
+            type: "block",
+            content: "Moved and updated",
             properties: {},
             children: [],
         }],
-    });
+    }).entity;
 
-    expect(replaced.blocks.map((block) => block.id)).toEqual([shared.id]);
-    expect(readObject(db, second.id).blocks[0]?.content).toBe("Shared globally updated");
-    expect(readBlock(db, omitted.id).content).toBe("First child");
+    expect(listObject(db, first.id).children).toEqual([]);
+    expect(listObject(db, second.id).children).toEqual([{ type: "block", id: moved.id }]);
+    expect(readObject(db, first.id).entity.children).toEqual([]);
+    expect(readObject(db, second.id).entity.children.map((child) => child.id)).toEqual([moved.id]);
+    expect(readBlock(db, moved.id).entity.content).toBe("Moved and updated");
 });
 
-test("entity-specific list functions return metadata and direct IDs", () => {
+test("moving an object to the database root detaches its prior parent", () => {
     db = initializeDatabase(":memory:");
-    const databaseID = readDatabase(db).id;
-    const object = writeObject(db, {
-        parentID: databaseID,
-        name: "Object",
+    const parent = writeObject(db, objectWrite("Parent")).entity;
+    const nested = parent.children[0]!.children[0]!;
+    if (nested.type !== "object") {
+        throw new Error("Expected nested child to be an object");
+    }
+
+    const moved = writeObject(db, {
+        id: nested.id,
+        type: "object",
+        name: "Moved Root",
         properties: {},
-        blocks: [{
-            content: "Parent",
+        children: [],
+    }).entity;
+
+    expect(listDatabase(db).objects).toEqual([parent.id, nested.id]);
+    expect(readObject(db, parent.id).entity.children[0]?.children).toEqual([]);
+    expect(readObject(db, nested.id).entity).toEqual(moved);
+});
+
+test("submitted children replace a moved entity's existing children", () => {
+    db = initializeDatabase(":memory:");
+    const first = writeObject(db, objectWrite("First")).entity;
+    const moved = first.children[0]!;
+    const oldChild = moved.children[0]!;
+    const second = writeObject(db, {
+        type: "object",
+        name: "Second",
+        properties: {},
+        children: [{
+            id: moved.id,
+            type: "block",
+            content: "Moved without children",
             properties: {},
-            children: [{
-                content: "Child",
-                properties: {},
-                children: [],
-            }],
+            children: [],
         }],
-    });
-    const parent = object.blocks[0]!;
-    const child = parent.children[0]!;
+    }).entity;
+
+    expect(readObject(db, first.id).entity.children).toEqual([]);
+    expect(readObject(db, second.id).entity.children.map((child) => child.id)).toEqual([moved.id]);
+    expect(readBlock(db, moved.id).entity.children).toEqual([]);
+    expect(readObject(db, oldChild.id).entity.children).toEqual([]);
+});
+
+test("entity-specific list functions return metadata and direct child refs", () => {
+    db = initializeDatabase(":memory:");
+    const objectResult = writeObject(db, objectWrite("Listed"));
+    const object = objectResult.entity;
+    const block = object.children[0]!;
+    const nested = block.children[0]!;
 
     expect(listDatabase(db)).toEqual({
+        parentID: null,
         metadata: readDatabase(db),
         objects: [object.id],
     });
     expect(listObject(db, object.id)).toEqual({
+        parentID: objectResult.parentID,
         metadata: {
             id: object.id,
-            parentID: databaseID,
-            name: "Object",
+            type: "object",
+            name: "Listed",
             properties: {},
         },
-        blocks: [parent.id],
+        children: [{ type: "block", id: block.id }],
     });
-    expect(listBlock(db, child.id, object.id)).toEqual({
+    expect(listBlock(db, block.id)).toEqual({
+        parentID: object.id,
         metadata: {
-            id: child.id,
+            id: block.id,
+            type: "block",
             properties: {},
         },
-        objectID: object.id,
-        ancestors: [parent.id],
-        children: [],
+        children: [{ type: "object", id: nested.id }],
     });
 });
 
-test("object deletion preserves canonical blocks", () => {
+test("standalone blocks can own children but are not database roots", () => {
     db = initializeDatabase(":memory:");
-    const databaseID = readDatabase(db).id;
-    const object = writeObject(db, {
-        parentID: databaseID,
-        name: "Nested",
+    const blockResult = writeBlock(db, {
+        type: "block",
+        content: "Standalone root",
         properties: {},
-        blocks: [{
-            content: "Preserved",
+        children: [{
+            type: "object",
+            name: "Nested only",
             properties: {},
             children: [],
         }],
     });
-    const blockID = object.blocks[0]!.id;
+    const block = blockResult.entity;
+
+    expect(blockResult.parentID).toBeNull();
+    expect(readBlock(db, block.id).entity).toEqual(block);
+    expect(listDatabase(db).objects).toEqual([]);
+});
+
+test("deleting an entity deletes its subtree", () => {
+    db = initializeDatabase(":memory:");
+    const object = writeObject(db, objectWrite("Delete")).entity;
+    const blockID = object.children[0]!.id;
+    const nestedObjectID = object.children[0]!.children[0]!.id;
 
     expect(deleteObject(db, object.id)).toBe(true);
     expect(() => readObject(db!, object.id)).toThrow();
-    expect(readBlock(db, blockID).content).toBe("Preserved");
+    expect(() => readBlock(db!, blockID)).toThrow();
+    expect(() => readObject(db!, nestedObjectID)).toThrow();
+
+    const standalone = writeBlock(db, {
+        type: "block",
+        content: "Parent",
+        properties: {},
+        children: [{
+            type: "block",
+            content: "Child",
+            properties: {},
+            children: [],
+        }],
+    }).entity;
+    const childID = standalone.children[0]!.id;
+    expect(deleteBlock(db, standalone.id)).toBe(true);
+    expect(() => readBlock(db!, childID)).toThrow();
 });
 
 test("search supports an optional entity type parameter", () => {
     db = initializeDatabase(":memory:");
-    const databaseID = readDatabase(db).id;
-    const object = createObject(db, databaseID, "Needle object");
-    const block = createBlock(db, "Needle block");
+    const object = createObject(db, "Needle object").entity;
+    const block = createBlock(db, "Needle block").entity;
 
     expect(search(db, "needle").map((result) => result.id)).toEqual([
         block.id,
@@ -265,52 +335,63 @@ test("search supports an optional entity type parameter", () => {
     }]);
 });
 
-test("writeObject rejects missing and duplicate existing blocks", () => {
+test("write validation rejects duplicate IDs and cycles", () => {
     db = initializeDatabase(":memory:");
-    const databaseID = readDatabase(db).id;
-    const existing = createBlock(db, "Existing");
+    const first = createObject(db, "First").entity;
+    const second = createObject(db, "Second").entity;
 
     expect(() => writeObject(db!, {
-        parentID: databaseID,
-        name: "Missing",
-        properties: {},
-        blocks: [{
-            id: "b_missing",
-            content: "Missing",
-            properties: {},
-            children: [],
-        }],
-    })).toThrow("Block not found");
-
-    expect(() => writeObject(db!, {
-        parentID: databaseID,
+        type: "object",
         name: "Duplicate",
         properties: {},
-        blocks: [{
-            id: existing.id,
+        children: [{
+            id: "b_same",
+            type: "block",
             content: "First",
             properties: {},
             children: [],
         }, {
-            id: existing.id,
+            id: "b_same",
+            type: "block",
             content: "Second",
             properties: {},
             children: [],
         }],
-    })).toThrow("Duplicate block ID");
-});
+    })).toThrow("Duplicate entity ID");
 
-function objectWrite(parentID: string, name: string, sharedBlockID: string): ObjectWrite {
-    return {
-        parentID,
-        name,
+    expect(() => writeObject(db!, {
+        id: first.id,
+        type: "object",
+        name: "Cycle",
         properties: {},
-        blocks: [{
-            id: sharedBlockID,
-            content: "Shared",
+        children: [{
+            id: second.id,
+            type: "object",
+            name: "Second",
             properties: {},
             children: [{
-                content: `${name} child`,
+                id: first.id,
+                type: "object",
+                name: "First",
+                properties: {},
+                children: [],
+            }],
+        }],
+    })).toThrow("Duplicate entity ID");
+});
+
+function objectWrite(name: string): ObjectWrite {
+    return {
+        type: "object",
+        name,
+        properties: {},
+        children: [{
+            type: "block",
+            content: `${name} block`,
+            properties: {},
+            children: [{
+                type: "object",
+                name: `${name} child object`,
                 properties: {},
                 children: [],
             }],

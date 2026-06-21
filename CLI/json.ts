@@ -1,8 +1,8 @@
 import type {
     BlockWrite,
-    ObjectBlockWrite,
+    EntityWrite,
     ObjectWrite,
-} from "../API/index.ts";
+} from "../index.ts";
 import { CLIInputError } from "./errors.ts";
 
 export type WriteInput =
@@ -11,92 +11,76 @@ export type WriteInput =
 
 type JSONObject = Record<string, unknown>;
 
-const blockFields = new Set(["id", "content", "properties"]);
-const objectBlockFields = new Set(["id", "content", "properties", "children"]);
-const objectFields = new Set(["id", "parentID", "name", "properties", "blocks"]);
+const blockFields = new Set(["id", "type", "content", "properties", "children"]);
+const objectFields = new Set(["id", "type", "name", "properties", "children"]);
 
 export function parseWriteInput(input: string): WriteInput {
     const value = parseJSONObject(input);
-    const hasBlocks = Object.hasOwn(value, "blocks");
-    const hasContent = Object.hasOwn(value, "content");
-
-    if (hasBlocks === hasContent) {
-        throw inputError(
-            "INVALID_WRITE_SHAPE",
-            "Write input must be an object with blocks or a block with content",
-        );
-    }
-
-    return hasBlocks
-        ? { entity: "object", value: validateObjectWrite(value) }
-        : { entity: "block", value: validateBlockWrite(value, "$") };
-}
-
-function validateObjectWrite(value: JSONObject): ObjectWrite {
-    rejectUnknownFields(value, objectFields, "$");
-    const id = optionalID(value, "id", "o_", "$.id");
-    const parentID = requiredString(value, "parentID", "$.parentID");
-    if (!parentID.startsWith("d_")) {
-        throw inputError(
-            "INVALID_PARENT_ID",
-            `Object parent must be a database ID: ${parentID}`,
-            { path: "$.parentID" },
-        );
-    }
-
-    const blocks = requiredArray(value, "blocks", "$.blocks");
     const explicitIDs = new Set<string>();
-    const validatedBlocks = blocks.map((block, index) =>
-        validateObjectBlock(block, `$.blocks[${index}]`, explicitIDs)
-    );
+    const entity = validateEntityWrite(value, "$", explicitIDs);
 
-    return {
-        ...(id === undefined ? {} : { id }),
-        parentID,
-        name: requiredString(value, "name", "$.name"),
-        ...optionalProperties(value, "$.properties"),
-        blocks: validatedBlocks,
-    };
+    return entity.type === "object"
+        ? { entity: "object", value: entity }
+        : { entity: "block", value: entity };
 }
 
-function validateObjectBlock(
+function validateEntityWrite(
     value: unknown,
     path: string,
     explicitIDs: Set<string>,
-): ObjectBlockWrite {
+): EntityWrite {
     const object = requireObject(value, path);
-    rejectUnknownFields(object, objectBlockFields, path);
-    const id = optionalID(object, "id", "b_", `${path}.id`);
+    const type = requiredString(object, "type", `${path}.type`);
 
-    if (id !== undefined) {
-        if (explicitIDs.has(id)) {
-            throw inputError(
-                "DUPLICATE_BLOCK_ID",
-                `Duplicate block ID: ${id}`,
-                { path: `${path}.id` },
-            );
-        }
-        explicitIDs.add(id);
+    if (type === "object") {
+        return validateObjectWrite(object, path, explicitIDs);
+    }
+    if (type === "block") {
+        return validateBlockWrite(object, path, explicitIDs);
     }
 
-    const children = requiredArray(object, "children", `${path}.children`);
+    throw inputError("INVALID_ENTITY_TYPE", `Invalid entity type at ${path}.type: ${type}`, {
+        path: `${path}.type`,
+    });
+}
+
+function validateObjectWrite(
+    value: JSONObject,
+    path: string,
+    explicitIDs: Set<string>,
+): ObjectWrite {
+    rejectUnknownFields(value, objectFields, path);
+    const id = optionalID(value, "id", "o_", `${path}.id`, explicitIDs);
+    const children = requiredArray(value, "children", `${path}.children`);
+
     return {
         ...(id === undefined ? {} : { id }),
-        content: requiredString(object, "content", `${path}.content`),
-        ...optionalProperties(object, `${path}.properties`),
+        type: "object",
+        name: requiredString(value, "name", `${path}.name`),
+        ...optionalProperties(value, `${path}.properties`),
         children: children.map((child, index) =>
-            validateObjectBlock(child, `${path}.children[${index}]`, explicitIDs)
+            validateEntityWrite(child, `${path}.children[${index}]`, explicitIDs)
         ),
     };
 }
 
-function validateBlockWrite(value: JSONObject, path: string): BlockWrite {
+function validateBlockWrite(
+    value: JSONObject,
+    path: string,
+    explicitIDs: Set<string>,
+): BlockWrite {
     rejectUnknownFields(value, blockFields, path);
-    const id = optionalID(value, "id", "b_", `${path}.id`);
+    const id = optionalID(value, "id", "b_", `${path}.id`, explicitIDs);
+    const children = requiredArray(value, "children", `${path}.children`);
+
     return {
         ...(id === undefined ? {} : { id }),
+        type: "block",
         content: requiredString(value, "content", `${path}.content`),
         ...optionalProperties(value, `${path}.properties`),
+        children: children.map((child, index) =>
+            validateEntityWrite(child, `${path}.children[${index}]`, explicitIDs)
+        ),
     };
 }
 
@@ -157,6 +141,7 @@ function optionalID(
     field: string,
     prefix: string,
     path: string,
+    explicitIDs: Set<string>,
 ): string | undefined {
     if (!Object.hasOwn(value, field)) {
         return undefined;
@@ -166,6 +151,10 @@ function optionalID(
     if (!id.startsWith(prefix)) {
         throw inputError("INVALID_ID", `Expected ${prefix} ID at ${path}: ${id}`, { path });
     }
+    if (explicitIDs.has(id)) {
+        throw inputError("DUPLICATE_ENTITY_ID", `Duplicate entity ID: ${id}`, { path });
+    }
+    explicitIDs.add(id);
     return id;
 }
 

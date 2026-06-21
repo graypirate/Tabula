@@ -1,16 +1,14 @@
-import type { ObjectBlock } from "./block";
-import type { DatabaseID } from "./database";
+import type { Entity } from "./entity";
 
 export type ObjID = string;
 
 export interface ObjMetadata {
     readonly id: ObjID;
-    parentID: DatabaseID;
+    readonly type: "object";
     name: string;
     properties?: Record<string, unknown>;
 }
 
-// Recursive structure
 export interface Obj extends ObjMetadata {
-    blocks: ObjectBlock[];
+    children: Entity[];
 }
