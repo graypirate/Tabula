@@ -1,6 +1,6 @@
 import type {
     BlockWrite,
-    EntityWrite,
+    Write,
     ObjectWrite,
 } from "../index.ts";
 import { CLIInputError } from "./errors.ts";
@@ -28,7 +28,7 @@ function validateEntityWrite(
     value: unknown,
     path: string,
     explicitIDs: Set<string>,
-): EntityWrite {
+): Write {
     const object = requireObject(value, path);
     const type = requiredString(object, "type", `${path}.type`);
 

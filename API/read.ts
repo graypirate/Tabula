@@ -1,30 +1,17 @@
 import type { Database } from "bun:sqlite";
 
 import {
-    readDatabaseMetadata,
     readDatabaseRootObjects,
-    listEntity as listStoredEntity,
+    readDirectEntityChildIDs,
+    readDatabaseMetadata,
     readEntityParentID,
     readEntityTree,
 } from "../core/storage";
-import type { Block, BlockID, BlockMetadata } from "../core/types/block";
+import type { Block, BlockID } from "../core/types/block";
 import type { DBMetadata } from "../core/types/database";
-import type { Entity } from "../core/types/entity";
-import type { Obj, ObjID, ObjMetadata } from "../core/types/object";
-import {
-    type BlockList,
-    type BlockResult,
-    type EntityList,
-    type EntityResult,
-    type ObjectList,
-    type ObjectResult,
-} from "./types";
-
-export interface DatabaseList {
-    parentID: null;
-    metadata: DBMetadata;
-    objects: ObjID[];
-}
+import type { Entity, EntityID } from "../core/types/entity";
+import type { Obj, ObjID } from "../core/types/object";
+import { type BlockResult, type EntityResult, type ObjectResult } from "./types";
 
 /**
  * Reads database metadata.
@@ -70,57 +57,45 @@ export function readBlock(db: Database, blockID: BlockID): BlockResult {
 }
 
 /**
- * Lists database metadata and root object IDs.
+ * Lists the database shape as ordered root object IDs.
  * @param db - The database to list
- * @returns The database list view
+ * @returns The ordered root object IDs
  */
-export function listDatabase(db: Database): DatabaseList {
-    const metadata = readDatabaseMetadata(db);
-    return {
-        parentID: null,
-        metadata,
-        objects: readDatabaseRootObjects(db),
-    };
+export function listDatabase(db: Database): ObjID[] {
+    return readDatabaseRootObjects(db);
 }
 
 /**
- * Lists object or block metadata and direct child entity references.
+ * Lists the direct child IDs for an object or block.
  * @param db - The database containing the entity
  * @param entityID - The object or block ID to list
- * @returns The parent-aware entity list view
+ * @returns The ordered direct child IDs
  */
-export function listEntity(db: Database, entityID: string): EntityList {
-    const result = listStoredEntity(db, entityID);
-    return {
-        parentID: result.parentID,
-        metadata: result.metadata,
-        children: result.children,
-    };
+export function listEntity(db: Database, entityID: EntityID): EntityID[] {
+    return readDirectEntityChildIDs(db, entityID);
 }
 
 /**
- * Lists object metadata and direct child entity references.
+ * Lists direct child IDs for an object.
  * @param db - The database containing the object
  * @param objectID - The object ID to list
- * @returns The object list view
+ * @returns The ordered direct child IDs
  */
-export function listObject(db: Database, objectID: ObjID): ObjectList {
-    const result = listEntity(db, objectID);
-    assertObjectList(result);
-    return result;
+export function listObject(db: Database, objectID: ObjID): EntityID[] {
+    return listEntity(db, objectID);
 }
 
 /**
- * Lists block metadata and direct child entity references.
+ * Lists direct child IDs for a block.
  * @param db - The database containing the block
  * @param blockID - The block ID to list
- * @returns The block list view
+ * @returns The ordered direct child IDs
  */
-export function listBlock(db: Database, blockID: BlockID): BlockList {
-    const result = listEntity(db, blockID);
-    assertBlockList(result);
-    return result;
+export function listBlock(db: Database, blockID: BlockID): EntityID[] {
+    return listEntity(db, blockID);
 }
+
+// Internal helpers
 
 function entityResult<T extends Entity>(db: Database, entity: T): EntityResult<T> {
     return {
@@ -138,17 +113,5 @@ function assertObjectResult(result: EntityResult): asserts result is ObjectResul
 function assertBlockResult(result: EntityResult): asserts result is BlockResult {
     if (result.entity.type !== "block") {
         throw new Error("Expected block result");
-    }
-}
-
-function assertObjectList(result: EntityList): asserts result is ObjectList {
-    if (result.metadata.type !== "object") {
-        throw new Error("Expected object list");
-    }
-}
-
-function assertBlockList(result: EntityList): asserts result is BlockList {
-    if (result.metadata.type !== "block") {
-        throw new Error("Expected block list");
     }
 }

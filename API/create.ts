@@ -12,11 +12,13 @@ import { createBlockID, createObjID } from "../core/utils/id";
 import {
     type BlockResult,
     type EntityCreate,
-    type EntityCreateOptions,
     type EntityResult,
     type ObjectResult,
-    type Properties,
 } from "./types";
+
+type CreateOptions = {
+    parentID?: string;
+};
 
 /**
  * Creates an object or block with no children.
@@ -28,7 +30,7 @@ import {
 export function createEntity(
     db: Database,
     input: EntityCreate,
-    options: EntityCreateOptions = {},
+    options: CreateOptions = {},
 ): EntityResult {
     const entity = buildEntity(db, input);
     createStoredEntity(db, entity, options.parentID ?? undefined);
@@ -46,8 +48,8 @@ export function createEntity(
 export function createObject(
     db: Database,
     name: string,
-    properties: Properties = {},
-    options: EntityCreateOptions = {},
+    properties: Record<string, unknown> = {},
+    options: CreateOptions = {},
 ): ObjectResult {
     const result = createEntity(db, {
         type: "object" as const,
@@ -69,8 +71,8 @@ export function createObject(
 export function createBlock(
     db: Database,
     content: string,
-    properties: Properties = {},
-    options: EntityCreateOptions = {},
+    properties: Record<string, unknown> = {},
+    options: CreateOptions = {},
 ): BlockResult {
     const result = createEntity(db, {
         type: "block" as const,

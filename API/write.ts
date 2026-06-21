@@ -11,21 +11,15 @@ import type { Obj, ObjID } from "../core/types/object";
 import { createBlockID, createObjID } from "../core/utils/id";
 import {
     type BlockResult,
-    type EntityCreateOptions,
     type EntityResult,
     type ObjectResult,
+    type BlockWrite,
+    type ObjectWrite,
+    type Write,
 } from "./types";
 
-export type EntityWrite = ObjectWrite | BlockWrite;
-
-export type BlockWrite = Omit<Block, "id" | "children"> & {
-    id?: BlockID;
-    children: EntityWrite[];
-};
-
-export type ObjectWrite = Omit<Obj, "id" | "children"> & {
-    id?: ObjID;
-    children: EntityWrite[];
+type WriteOptions = {
+    parentID?: string;
 };
 
 /**
@@ -35,10 +29,10 @@ export type ObjectWrite = Omit<Obj, "id" | "children"> & {
  * @param options - Optional parent placement for the root entity
  * @returns The stored parent-aware recursive entity result
  */
-export function writeEntity(
+export function write(
     db: Database,
-    input: EntityWrite,
-    options: EntityCreateOptions = {},
+    input: Write,
+    options: WriteOptions = {},
 ): EntityResult {
     const entity = prepareEntity(db, input);
     const stored = writeEntityTree(db, entity, options.parentID ?? undefined);
@@ -58,9 +52,9 @@ export function writeEntity(
 export function writeBlock(
     db: Database,
     input: BlockWrite,
-    options: EntityCreateOptions = {},
+    options: WriteOptions = {},
 ): BlockResult {
-    const result = writeEntity(db, input, options);
+    const result = write(db, input, options);
     assertBlockResult(result);
     return result;
 }
@@ -75,18 +69,18 @@ export function writeBlock(
 export function writeObject(
     db: Database,
     input: ObjectWrite,
-    options: EntityCreateOptions = {},
+    options: WriteOptions = {},
 ): ObjectResult {
-    const result = writeEntity(db, input, options);
+    const result = write(db, input, options);
     assertObjectResult(result);
     return result;
 }
 
 /** Assigns IDs while producing a recursive public entity tree. */
-function prepareEntity(db: Database, input: EntityWrite): Entity {
+function prepareEntity(db: Database, input: Write): Entity {
     const usedIDs = new Set<string>();
 
-    const visit = (entity: EntityWrite): Entity => {
+    const visit = (entity: Write): Entity => {
         const id = entity.id ?? createAvailableEntityID(db, entity.type, usedIDs);
         if (usedIDs.has(id)) {
             throw new Error(`Duplicate entity ID in write tree: ${id}`);
