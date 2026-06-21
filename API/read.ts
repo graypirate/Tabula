@@ -9,9 +9,21 @@ import {
 } from "../core/storage";
 import type { Block, BlockID } from "../core/types/block";
 import type { DBMetadata } from "../core/types/database";
-import type { Entity, EntityID } from "../core/types/entity";
+import type { Entity, EntityID } from "../core/types/graph";
 import type { Obj, ObjID } from "../core/types/object";
-import { type BlockResult, type EntityResult, type ObjectResult } from "./types";
+import { type BlockResult, type Result, type ObjectResult } from "./types";
+
+// Read functions
+
+/**
+ * Reads an object or block as a parent-aware recursive entity result.
+ * @param db - The database containing the entity
+ * @param id - The object or block ID to read
+ * @returns The parent-aware recursive entity result
+ */
+export function readEntity(db: Database, id: string): Result {
+    return entityResult(db, readEntityTree(db, id));
+}
 
 /**
  * Reads database metadata.
@@ -20,16 +32,6 @@ import { type BlockResult, type EntityResult, type ObjectResult } from "./types"
  */
 export function readDatabase(db: Database): DBMetadata {
     return readDatabaseMetadata(db);
-}
-
-/**
- * Reads an object or block as a parent-aware recursive entity result.
- * @param db - The database containing the entity
- * @param entityID - The object or block ID to read
- * @returns The parent-aware recursive entity result
- */
-export function readEntity(db: Database, entityID: string): EntityResult {
-    return entityResult(db, readEntityTree(db, entityID));
 }
 
 /**
@@ -55,6 +57,8 @@ export function readBlock(db: Database, blockID: BlockID): BlockResult {
     assertBlockResult(result);
     return result;
 }
+
+// List functions
 
 /**
  * Lists the database shape as ordered root object IDs.
@@ -97,20 +101,20 @@ export function listBlock(db: Database, blockID: BlockID): EntityID[] {
 
 // Internal helpers
 
-function entityResult<T extends Entity>(db: Database, entity: T): EntityResult<T> {
+function entityResult<T extends Entity>(db: Database, entity: T): Result<T> {
     return {
         parentID: readEntityParentID(db, entity.id),
         entity,
     };
 }
 
-function assertObjectResult(result: EntityResult): asserts result is ObjectResult {
+function assertObjectResult(result: Result): asserts result is ObjectResult {
     if (result.entity.type !== "object") {
         throw new Error("Expected object result");
     }
 }
 
-function assertBlockResult(result: EntityResult): asserts result is BlockResult {
+function assertBlockResult(result: Result): asserts result is BlockResult {
     if (result.entity.type !== "block") {
         throw new Error("Expected block result");
     }

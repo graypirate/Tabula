@@ -2,11 +2,6 @@ import type { Database } from "bun:sqlite";
 
 import type { BlockID, BlockMetadata } from "../../types/block";
 import { BlockPrefix } from "../../utils/id";
-import {
-    deleteStoredEntitySubtrees,
-    insertStoredEntity,
-    upsertStoredEntity,
-} from "./entities";
 import type { StoredBlock } from "../types";
 
 /**
@@ -17,15 +12,10 @@ import type { StoredBlock } from "../types";
 export function insertStoredBlock(db: Database, block: StoredBlock): void {
     validateBlock(block);
 
-    const insert = db.transaction(() => {
-        insertStoredEntity(db, { type: "block", id: block.id });
-        db.query(`
-            INSERT INTO blocks (id, content, properties)
-            VALUES ($id, $content, $properties)
-        `).run(blockParameters(block));
-    });
-
-    insert();
+    db.query(`
+        INSERT INTO blocks (id, content, properties)
+        VALUES ($id, $content, $properties)
+    `).run(blockParameters(block));
 }
 
 /**
@@ -56,27 +46,17 @@ export function insertStoredBlocks(db: Database, blocks: StoredBlock[]): void {
 export function upsertStoredBlock(db: Database, block: StoredBlock): void {
     validateBlock(block);
 
-    const upsert = db.transaction(() => {
-        const exists = isStoredBlock(db, block.id);
-        upsertStoredEntity(db, { type: "block", id: block.id });
-
-        if (exists) {
-            db.query(`
-                UPDATE blocks
-                SET content = $content,
-                    properties = $properties
-                WHERE id = $id
-            `).run(blockParameters(block));
-            return;
-        }
-
+    if (isStoredBlock(db, block.id)) {
         db.query(`
-            INSERT INTO blocks (id, content, properties)
-            VALUES ($id, $content, $properties)
+            UPDATE blocks
+            SET content = $content,
+                properties = $properties
+            WHERE id = $id
         `).run(blockParameters(block));
-    });
+        return;
+    }
 
-    upsert();
+    insertStoredBlock(db, block);
 }
 
 /**
@@ -170,7 +150,7 @@ export function updateStoredBlocks(db: Database, blocks: StoredBlock[]): void {
 }
 
 /**
- * Deletes one block and its recursive containment subtree.
+ * Deletes one block row without deleting its graph node or containment subtree.
  * @param db - The database containing the block
  * @param blockID - The block ID to delete
  * @returns True if the block existed and was deleted
@@ -180,13 +160,22 @@ export function deleteStoredBlock(db: Database, blockID: BlockID): boolean {
 }
 
 /**
- * Deletes blocks and their recursive containment subtrees.
+ * Deletes block rows without deleting graph nodes or containment subtrees.
  * @param db - The database containing the blocks
  * @param blockIDs - The block IDs to delete
  * @returns The number of requested block IDs that existed
  */
 export function deleteStoredBlocks(db: Database, blockIDs: BlockID[]): number {
-    return deleteStoredEntitySubtrees(db, blockIDs);
+    if (blockIDs.length === 0) {
+        return 0;
+    }
+
+    const result = db.query(`
+        DELETE FROM blocks
+        WHERE id IN (SELECT value FROM json_each($ids))
+    `).run({ $ids: JSON.stringify([...new Set(blockIDs)]) });
+
+    return result.changes;
 }
 
 /**

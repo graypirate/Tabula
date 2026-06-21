@@ -21,7 +21,7 @@ export type {
     EntityParentID,
     EntityReference,
     EntityType,
-} from "../core/types/entity";
+} from "../core/types/graph";
 export type {
     Obj,
     ObjID,

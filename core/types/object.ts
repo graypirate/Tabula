@@ -1,4 +1,4 @@
-import type { Entity } from "./entity";
+import type { Entity } from "./graph";
 
 export type ObjID = string;
 

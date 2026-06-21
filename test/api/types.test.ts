@@ -1,9 +1,8 @@
 import { expect, test } from "bun:test";
 
-import { entityReference, entityReferences } from "../../API/types";
-import type { Entity } from "../../core/types/entity";
+import type { Entity } from "../../core/types/graph";
 
-test("builds shallow entity references from recursive entities", () => {
+test("public entities can be projected into shallow references", () => {
     const entities: Entity[] = [{
         id: "o_one",
         type: "object",
@@ -18,8 +17,14 @@ test("builds shallow entity references from recursive entities", () => {
         children: [],
     }];
 
-    expect(entityReference(entities[0]!)).toEqual({ type: "object", id: "o_one" });
-    expect(entityReferences(entities)).toEqual([
+    expect({
+        type: entities[0]!.type,
+        id: entities[0]!.id,
+    }).toEqual({ type: "object", id: "o_one" });
+    expect(entities.map((entity) => ({
+        type: entity.type,
+        id: entity.id,
+    }))).toEqual([
         { type: "object", id: "o_one" },
         { type: "block", id: "b_two" },
     ]);

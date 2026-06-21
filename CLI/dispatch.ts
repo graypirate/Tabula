@@ -1,5 +1,5 @@
 import {
-    createEntity,
+    create,
     deleteEntity as deleteAPIEntity,
     initializeDatabase,
     listDatabase,
@@ -8,7 +8,7 @@ import {
     readDatabase,
     readEntity as readAPIEntity,
     search,
-    write,
+    writeEntity,
 } from "../index.ts";
 import { inferEntityType, type CLICommand } from "./arguments.ts";
 import { CLIInputError, CLIOperationError } from "./errors.ts";
@@ -40,13 +40,13 @@ export function dispatchCommand(command: CLICommand, writeInput?: WriteInput): u
             case "create": {
                 switch (command.entity) {
                     case "object":
-                        return createEntity(db, {
+                        return create(db, {
                             type: "object",
                             name: command.name,
                             properties,
                         }, createOptions(command.parentID));
                     case "block":
-                        return createEntity(db, {
+                        return create(db, {
                             type: "block",
                             content: command.content,
                             properties,
@@ -57,7 +57,7 @@ export function dispatchCommand(command: CLICommand, writeInput?: WriteInput): u
                 if (writeInput === undefined) {
                     throw new Error("Validated write input is required");
                 }
-                return write(db, writeInput.value);
+                return writeEntity(db, writeInput.value);
             case "read":
                 return readCommandEntity(db, command.id);
             case "list":

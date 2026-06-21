@@ -4,7 +4,7 @@ import type { DBMetadata } from "../../types/database";
 import { createDatabaseID } from "../../utils/id";
 import schema from "./schema.sql" with { type: "text" };
 
-export const SchemaVersion = "0.2.0";
+export const SchemaVersion = "0.0.3";
 
 type DatabaseRow = {
     id: string;
@@ -37,7 +37,7 @@ export function initDatabase(path: string, name?: string): Database {
             const insertMetadata = db.transaction(() => {
                 const databaseID = createDatabaseID();
                 db.query(`
-                    INSERT INTO entities (id, type)
+                    INSERT INTO nodes (id, type)
                     VALUES ($id, 'database')
                 `).run({ $id: databaseID });
                 db.query(`

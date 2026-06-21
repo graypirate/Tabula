@@ -30,7 +30,7 @@ test("initDatabase creates one database metadata row with an optional name", () 
     expect(unnamed.name).toBeUndefined();
     expect(unnamed.schemaVersion).toBe(SchemaVersion);
     expect(db.query('SELECT COUNT(*) AS count FROM "database"').get()).toEqual({ count: 1 });
-    expect(db.query("SELECT id, type FROM entities").all()).toEqual([
+    expect(db.query("SELECT id, type FROM nodes").all()).toEqual([
         { id: unnamed.id, type: "database" },
     ]);
     expect(() => db!.query(`

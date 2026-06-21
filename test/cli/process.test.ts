@@ -5,12 +5,9 @@ import { join, resolve } from "node:path";
 
 import type {
     Block,
-    BlockList,
     DBMetadata,
-    DatabaseList,
-    EntityResult,
+    Result,
     Obj,
-    ObjectList,
     SearchResult,
 } from "../../API/index.ts";
 
@@ -38,10 +35,10 @@ describe("CLI process output", () => {
         expect(initialized.id).toStartWith("d_");
         expect(initialized).toMatchObject({
             name: "CLI Test",
-            schemaVersion: "0.2.0",
+            schemaVersion: "0.0.3",
         });
 
-        const emptyObjectResult = await successfulJSON<EntityResult<Obj>>([
+        const emptyObjectResult = await successfulJSON<Result<Obj>>([
             "create",
             "object",
             "--database",
@@ -61,7 +58,7 @@ describe("CLI process output", () => {
             properties: { status: "active", priority: 2 },
         });
 
-        const quickBlockResult = await successfulJSON<EntityResult<Block>>([
+        const quickBlockResult = await successfulJSON<Result<Block>>([
             "create",
             "block",
             "--database",
@@ -77,7 +74,7 @@ describe("CLI process output", () => {
         expect(quickBlock.children).toEqual([]);
         expect(quickBlock.properties).toEqual({ done: false });
 
-        const childBlockResult = await successfulJSON<EntityResult<Block>>([
+        const childBlockResult = await successfulJSON<Result<Block>>([
             "create",
             "block",
             "--database",
@@ -90,7 +87,7 @@ describe("CLI process output", () => {
         expect(childBlockResult.parentID).toBe(emptyObject.id);
         expect(childBlockResult.entity.children).toEqual([]);
 
-        const objectResult = await successfulJSON<EntityResult<Obj>>([
+        const objectResult = await successfulJSON<Result<Obj>>([
             "write",
             "--database",
             databasePath,
@@ -122,62 +119,41 @@ describe("CLI process output", () => {
         const parentBlockID = object.children[0]!.id;
         const childObjectID = object.children[0]!.children[0]!.id;
 
-        expect(await successfulJSON<EntityResult<Obj>>([
+        expect(await successfulJSON<Result<Obj>>([
             "read",
             objectID,
             "--database",
             databasePath,
         ])).toEqual(objectResult);
 
-        const rewritten = await successfulJSON<EntityResult<Obj>>([
+        const rewritten = await successfulJSON<Result<Obj>>([
             "write",
             "--database",
             databasePath,
         ], JSON.stringify(object));
         expect(rewritten).toEqual(objectResult);
 
-        expect(await successfulJSON<ObjectList>([
+        expect(await successfulJSON<string[]>([
             "list",
             objectID,
             "--database",
             databasePath,
-        ])).toEqual({
-            parentID: initialized.id,
-            metadata: {
-                id: objectID,
-                type: "object",
-                name: "AgentDB",
-                properties: { stage: "MVP" },
-            },
-            children: [
-                { type: "block", id: parentBlockID },
-                { type: "block", id: object.children[1]!.id },
-            ],
-        });
+        ])).toEqual([parentBlockID, object.children[1]!.id]);
 
-        expect(await successfulJSON<BlockList>([
+        expect(await successfulJSON<string[]>([
             "list",
             parentBlockID,
             "--database",
             databasePath,
-        ])).toEqual({
-            parentID: objectID,
-            metadata: {
-                id: parentBlockID,
-                type: "block",
-                properties: { done: false },
-            },
-            children: [{ type: "object", id: childObjectID }],
-        });
+        ])).toEqual([childObjectID]);
 
-        const databaseList = await successfulJSON<DatabaseList>([
+        const databaseList = await successfulJSON<string[]>([
             "list",
             initialized.id,
             "--database",
             databasePath,
         ]);
-        expect(databaseList.parentID).toBeNull();
-        expect(databaseList.objects).toEqual([emptyObject.id, objectID]);
+        expect(databaseList).toEqual([emptyObject.id, objectID]);
 
         expect(await successfulJSON<boolean>([
             "delete",
@@ -191,7 +167,7 @@ describe("CLI process output", () => {
         const databasePath = createDatabasePath();
         await successfulJSON<DBMetadata>(["init", "--database", databasePath]);
 
-        const createdResult = await successfulJSON<EntityResult<Block>>([
+        const createdResult = await successfulJSON<Result<Block>>([
             "write",
             "--database",
             databasePath,
@@ -204,7 +180,7 @@ describe("CLI process output", () => {
         expect(createdResult.parentID).toBeNull();
         expect(created.id).toStartWith("b_");
 
-        const updated = await successfulJSON<EntityResult<Block>>([
+        const updated = await successfulJSON<Result<Block>>([
             "write",
             "--database",
             databasePath,

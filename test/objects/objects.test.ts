@@ -5,12 +5,11 @@ import { insertStoredBlock, isStoredBlock } from "../../core/storage/db/blocks";
 import {
     appendDatabaseRootObject,
     getDatabaseRootObjects,
-    readStoredObjectTree,
     replaceEntityChildren,
-} from "../../core/storage/db/entities";
+} from "../../core/storage/db/edges";
 import { getDatabaseMetadata, initDatabase } from "../../core/storage/db/init";
+import { insertStoredNode } from "../../core/storage/db/nodes";
 import {
-    deleteStoredObject,
     getObjectMetadata,
     getStoredObject,
     insertStoredObject,
@@ -18,6 +17,10 @@ import {
     updateObjectMetadata,
     updateStoredObject,
 } from "../../core/storage/db/objects";
+import {
+    deleteObjectTree,
+    readObjectTree,
+} from "../../core/storage";
 
 let db: Database | undefined;
 
@@ -29,6 +32,7 @@ afterEach(() => {
 test("object operations persist caller IDs and metadata", () => {
     db = initDatabase(":memory:", "Test Database");
 
+    insertStoredNode(db, { id: "o_root", type: "object" });
     insertStoredObject(db, {
         id: "o_root",
         type: "object",
@@ -48,7 +52,7 @@ test("object operations persist caller IDs and metadata", () => {
         id: "o_root",
         type: "object",
         name: "Duplicate",
-    })).toThrow("Entity already exists");
+    })).toThrow();
 
     updateObjectMetadata(db, {
         id: "o_root",
@@ -68,7 +72,9 @@ test("database roots are stored as object containment edges", () => {
     db = initDatabase(":memory:");
     const databaseID = getDatabaseMetadata(db).id;
 
+    insertStoredNode(db, { id: "o_first", type: "object" });
     insertStoredObject(db, { id: "o_first", type: "object", name: "First" });
+    insertStoredNode(db, { id: "o_second", type: "object" });
     insertStoredObject(db, { id: "o_second", type: "object", name: "Second" });
 
     appendDatabaseRootObject(db, databaseID, "o_first");
@@ -80,8 +86,11 @@ test("database roots are stored as object containment edges", () => {
 
 test("objects read recursive mixed children through entity containment", () => {
     db = initDatabase(":memory:");
+    insertStoredNode(db, { id: "o_root", type: "object" });
     insertStoredObject(db, { id: "o_root", type: "object", name: "Root" });
+    insertStoredNode(db, { id: "o_nested", type: "object" });
     insertStoredObject(db, { id: "o_nested", type: "object", name: "Nested" });
+    insertStoredNode(db, { id: "b_parent", type: "block" });
     insertStoredBlock(db, {
         id: "b_parent",
         type: "block",
@@ -92,7 +101,7 @@ test("objects read recursive mixed children through entity containment", () => {
         ["b_parent", [{ type: "object", id: "o_nested" }]],
     ]));
 
-    expect(readStoredObjectTree(db, "o_root")).toEqual({
+    expect(readObjectTree(db, "o_root")).toEqual({
         id: "o_root",
         type: "object",
         name: "Root",
@@ -115,7 +124,9 @@ test("objects read recursive mixed children through entity containment", () => {
 
 test("deleteStoredObject removes the object subtree", () => {
     db = initDatabase(":memory:");
+    insertStoredNode(db, { id: "o_root", type: "object" });
     insertStoredObject(db, { id: "o_root", type: "object", name: "Root" });
+    insertStoredNode(db, { id: "b_child", type: "block" });
     insertStoredBlock(db, {
         id: "b_child",
         type: "block",
@@ -125,15 +136,17 @@ test("deleteStoredObject removes the object subtree", () => {
         ["o_root", [{ type: "block", id: "b_child" }]],
     ]));
 
-    expect(deleteStoredObject(db, "o_root")).toBe(true);
-    expect(deleteStoredObject(db, "o_root")).toBe(false);
+    expect(deleteObjectTree(db, "o_root")).toBe(true);
+    expect(deleteObjectTree(db, "o_root")).toBe(false);
     expect(isStoredObject(db, "o_root")).toBe(false);
     expect(isStoredBlock(db, "b_child")).toBe(false);
 });
 
 test("updateStoredObject updates metadata without changing children", () => {
     db = initDatabase(":memory:");
+    insertStoredNode(db, { id: "o_root", type: "object" });
     insertStoredObject(db, { id: "o_root", type: "object", name: "Root" });
+    insertStoredNode(db, { id: "b_child", type: "block" });
     insertStoredBlock(db, {
         id: "b_child",
         type: "block",
@@ -150,7 +163,7 @@ test("updateStoredObject updates metadata without changing children", () => {
         properties: { done: true },
     });
 
-    const object = readStoredObjectTree(db, "o_root");
+    const object = readObjectTree(db, "o_root");
     expect(object.name).toBe("Updated");
     expect(object.properties).toEqual({ done: true });
     expect(object.children.map((child) => child.id)).toEqual(["b_child"]);

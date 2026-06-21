@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 import {
     createBlock,
-    createEntity,
+    create,
     createObject,
     deleteBlock,
     deleteEntity,
@@ -82,24 +82,24 @@ test("quick create functions return recursive public entities", () => {
     });
     expect(readObject(db, object.id).entity).toEqual(object);
     expect(readBlock(db, block.id).entity).toEqual(block);
-    expect(listDatabase(db).objects).toEqual([object.id]);
+    expect(listDatabase(db)).toEqual([object.id]);
 });
 
 test("generic create can attach entities to a parent", () => {
     db = initializeDatabase(":memory:");
-    const object = createEntity(db, {
+    const object = create(db, {
         type: "object",
         name: "Parent",
         properties: {},
     }).entity;
-    const child = createEntity(db, {
+    const child = create(db, {
         type: "block",
         content: "Child",
         properties: {},
     }, { parentID: object.id });
 
     expect(child.parentID).toBe(object.id);
-    expect(listEntity(db, object.id).children).toEqual([{ type: "block", id: child.entity.id }]);
+    expect(listEntity(db, object.id)).toEqual([child.entity.id]);
 });
 
 test("writeObject creates a mixed recursive entity tree", () => {
@@ -187,8 +187,8 @@ test("explicit IDs move existing entities into the submitted tree", () => {
         }],
     }).entity;
 
-    expect(listObject(db, first.id).children).toEqual([]);
-    expect(listObject(db, second.id).children).toEqual([{ type: "block", id: moved.id }]);
+    expect(listObject(db, first.id)).toEqual([]);
+    expect(listObject(db, second.id)).toEqual([moved.id]);
     expect(readObject(db, first.id).entity.children).toEqual([]);
     expect(readObject(db, second.id).entity.children.map((child) => child.id)).toEqual([moved.id]);
     expect(readBlock(db, moved.id).entity.content).toBe("Moved and updated");
@@ -210,7 +210,7 @@ test("moving an object to the database root detaches its prior parent", () => {
         children: [],
     }).entity;
 
-    expect(listDatabase(db).objects).toEqual([parent.id, nested.id]);
+    expect(listDatabase(db)).toEqual([parent.id, nested.id]);
     expect(readObject(db, parent.id).entity.children[0]?.children).toEqual([]);
     expect(readObject(db, nested.id).entity).toEqual(moved);
 });
@@ -239,37 +239,16 @@ test("submitted children replace a moved entity's existing children", () => {
     expect(readObject(db, oldChild.id).entity.children).toEqual([]);
 });
 
-test("entity-specific list functions return metadata and direct child refs", () => {
+test("entity-specific list functions return direct child IDs", () => {
     db = initializeDatabase(":memory:");
     const objectResult = writeObject(db, objectWrite("Listed"));
     const object = objectResult.entity;
     const block = object.children[0]!;
     const nested = block.children[0]!;
 
-    expect(listDatabase(db)).toEqual({
-        parentID: null,
-        metadata: readDatabase(db),
-        objects: [object.id],
-    });
-    expect(listObject(db, object.id)).toEqual({
-        parentID: objectResult.parentID,
-        metadata: {
-            id: object.id,
-            type: "object",
-            name: "Listed",
-            properties: {},
-        },
-        children: [{ type: "block", id: block.id }],
-    });
-    expect(listBlock(db, block.id)).toEqual({
-        parentID: object.id,
-        metadata: {
-            id: block.id,
-            type: "block",
-            properties: {},
-        },
-        children: [{ type: "object", id: nested.id }],
-    });
+    expect(listDatabase(db)).toEqual([object.id]);
+    expect(listObject(db, object.id)).toEqual([block.id]);
+    expect(listBlock(db, block.id)).toEqual([nested.id]);
 });
 
 test("standalone blocks can own children but are not database roots", () => {
@@ -289,7 +268,7 @@ test("standalone blocks can own children but are not database roots", () => {
 
     expect(blockResult.parentID).toBeNull();
     expect(readBlock(db, block.id).entity).toEqual(block);
-    expect(listDatabase(db).objects).toEqual([]);
+    expect(listDatabase(db)).toEqual([]);
 });
 
 test("deleting an entity deletes its subtree", () => {

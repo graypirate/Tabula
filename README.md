@@ -142,11 +142,11 @@ agentdb list b_example --database ./workspace.sqlite
 `read` returns `{ "parentID": string | null, "entity": ... }`. The nested
 `entity` is the complete recursive object or block shape accepted by `write`.
 
-`list` returns top-level parent metadata, entity metadata, and direct children:
+`list` returns shape only:
 
 - Databases list their direct object IDs.
-- Objects list their parent ID and typed direct child references.
-- Blocks list their parent ID and typed direct child references.
+- Objects list their ordered direct child IDs.
+- Blocks list their ordered direct child IDs.
 
 When reading or listing a database ID, it must match the database stored at the
 provided path.

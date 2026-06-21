@@ -2,7 +2,7 @@
 
 import type { BlockMetadata } from "../types/block";
 import type { DatabaseID } from "../types/database";
-import type { EntityID, EntityType } from "../types/entity";
+import type { EntityID, EntityType } from "../types/graph";
 import type { ObjMetadata } from "../types/object";
 
 export type StoredEntityType = "database" | EntityType;

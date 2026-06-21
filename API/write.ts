@@ -6,12 +6,12 @@ import {
     writeEntityTree,
 } from "../core/storage";
 import type { Block, BlockID } from "../core/types/block";
-import type { Entity } from "../core/types/entity";
+import type { Entity } from "../core/types/graph";
 import type { Obj, ObjID } from "../core/types/object";
 import { createBlockID, createObjID } from "../core/utils/id";
 import {
     type BlockResult,
-    type EntityResult,
+    type Result,
     type ObjectResult,
     type BlockWrite,
     type ObjectWrite,
@@ -29,11 +29,11 @@ type WriteOptions = {
  * @param options - Optional parent placement for the root entity
  * @returns The stored parent-aware recursive entity result
  */
-export function write(
+export function writeEntity(
     db: Database,
     input: Write,
     options: WriteOptions = {},
-): EntityResult {
+): Result {
     const entity = prepareEntity(db, input);
     const stored = writeEntityTree(db, entity, options.parentID ?? undefined);
     return {
@@ -54,7 +54,7 @@ export function writeBlock(
     input: BlockWrite,
     options: WriteOptions = {},
 ): BlockResult {
-    const result = write(db, input, options);
+    const result = writeEntity(db, input, options);
     assertBlockResult(result);
     return result;
 }
@@ -71,7 +71,7 @@ export function writeObject(
     input: ObjectWrite,
     options: WriteOptions = {},
 ): ObjectResult {
-    const result = write(db, input, options);
+    const result = writeEntity(db, input, options);
     assertObjectResult(result);
     return result;
 }
@@ -111,13 +111,13 @@ function prepareEntity(db: Database, input: Write): Entity {
     return visit(input);
 }
 
-function assertObjectResult(result: EntityResult): asserts result is ObjectResult {
+function assertObjectResult(result: Result): asserts result is ObjectResult {
     if (result.entity.type !== "object") {
         throw new Error("Expected object result");
     }
 }
 
-function assertBlockResult(result: EntityResult): asserts result is BlockResult {
+function assertBlockResult(result: Result): asserts result is BlockResult {
     if (result.entity.type !== "block") {
         throw new Error("Expected block result");
     }

@@ -7,12 +7,12 @@ import {
     readEntityParentID,
     readEntityTree,
 } from "../core/storage";
-import type { Entity } from "../core/types/entity";
+import type { Entity } from "../core/types/graph";
 import { createBlockID, createObjID } from "../core/utils/id";
 import {
     type BlockResult,
-    type EntityCreate,
-    type EntityResult,
+    type Create,
+    type Result,
     type ObjectResult,
 } from "./types";
 
@@ -27,11 +27,11 @@ type CreateOptions = {
  * @param options - Optional parent placement
  * @returns The parent-aware created entity result
  */
-export function createEntity(
+export function create(
     db: Database,
-    input: EntityCreate,
+    input: Create,
     options: CreateOptions = {},
-): EntityResult {
+): Result {
     const entity = buildEntity(db, input);
     createStoredEntity(db, entity, options.parentID ?? undefined);
     return entityResult(db, entity.id);
@@ -51,7 +51,7 @@ export function createObject(
     properties: Record<string, unknown> = {},
     options: CreateOptions = {},
 ): ObjectResult {
-    const result = createEntity(db, {
+    const result = create(db, {
         type: "object" as const,
         name,
         properties,
@@ -74,7 +74,7 @@ export function createBlock(
     properties: Record<string, unknown> = {},
     options: CreateOptions = {},
 ): BlockResult {
-    const result = createEntity(db, {
+    const result = create(db, {
         type: "block" as const,
         content,
         properties,
@@ -83,7 +83,7 @@ export function createBlock(
     return result;
 }
 
-function buildEntity(db: Database, input: EntityCreate): Entity {
+function buildEntity(db: Database, input: Create): Entity {
     if (input.type === "object") {
         return {
             id: createAvailableID(createObjID, (id) => objectExists(db, id)),
@@ -103,20 +103,20 @@ function buildEntity(db: Database, input: EntityCreate): Entity {
     };
 }
 
-function entityResult(db: Database, entityID: string): EntityResult {
+function entityResult(db: Database, entityID: string): Result {
     return {
         parentID: readEntityParentID(db, entityID),
         entity: readEntityTree(db, entityID),
     };
 }
 
-function assertObjectResult(result: EntityResult): asserts result is ObjectResult {
+function assertObjectResult(result: Result): asserts result is ObjectResult {
     if (result.entity.type !== "object") {
         throw new Error("Expected object result");
     }
 }
 
-function assertBlockResult(result: EntityResult): asserts result is BlockResult {
+function assertBlockResult(result: Result): asserts result is BlockResult {
     if (result.entity.type !== "block") {
         throw new Error("Expected block result");
     }

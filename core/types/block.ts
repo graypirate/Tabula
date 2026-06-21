@@ -8,5 +8,5 @@ export interface BlockMetadata {
 
 export interface Block extends BlockMetadata {
     content: string;
-    children: import("./entity").Entity[];
+    children: import("./graph").Entity[];
 }

@@ -2,11 +2,6 @@ import type { Database } from "bun:sqlite";
 
 import type { ObjID, ObjMetadata } from "../../types/object";
 import { ObjectPrefix } from "../../utils/id";
-import {
-    deleteStoredEntitySubtrees,
-    insertStoredEntity,
-    upsertStoredEntity,
-} from "./entities";
 import type { StoredObject } from "../types";
 
 type ObjectRow = {
@@ -23,15 +18,10 @@ type ObjectRow = {
 export function insertStoredObject(db: Database, metadata: StoredObject): void {
     validateObjectMetadata(metadata);
 
-    const insert = db.transaction(() => {
-        insertStoredEntity(db, { type: "object", id: metadata.id });
-        db.query(`
-            INSERT INTO objects (id, name, properties)
-            VALUES ($id, $name, $properties)
-        `).run(mapObjectParameters(metadata));
-    });
-
-    insert();
+    db.query(`
+        INSERT INTO objects (id, name, properties)
+        VALUES ($id, $name, $properties)
+    `).run(mapObjectParameters(metadata));
 }
 
 /**
@@ -42,27 +32,17 @@ export function insertStoredObject(db: Database, metadata: StoredObject): void {
 export function upsertStoredObject(db: Database, metadata: StoredObject): void {
     validateObjectMetadata(metadata);
 
-    const upsert = db.transaction(() => {
-        const exists = isStoredObject(db, metadata.id);
-        upsertStoredEntity(db, { type: "object", id: metadata.id });
-
-        if (exists) {
-            db.query(`
-                UPDATE objects
-                SET name = $name,
-                    properties = $properties
-                WHERE id = $id
-            `).run(mapObjectParameters(metadata));
-            return;
-        }
-
+    if (isStoredObject(db, metadata.id)) {
         db.query(`
-            INSERT INTO objects (id, name, properties)
-            VALUES ($id, $name, $properties)
+            UPDATE objects
+            SET name = $name,
+                properties = $properties
+            WHERE id = $id
         `).run(mapObjectParameters(metadata));
-    });
+        return;
+    }
 
-    upsert();
+    insertStoredObject(db, metadata);
 }
 
 /**
@@ -130,13 +110,18 @@ export function updateStoredObject(db: Database, object: StoredObject): void {
 }
 
 /**
- * Deletes an object and its recursive containment subtree.
+ * Deletes an object row without deleting its graph node or containment subtree.
  * @param db - The database containing the object
  * @param objectID - The object ID to delete
  * @returns True if the object existed and was deleted
  */
 export function deleteStoredObject(db: Database, objectID: ObjID): boolean {
-    return deleteStoredEntitySubtrees(db, [objectID]) > 0;
+    const result = db.query(`
+        DELETE FROM objects
+        WHERE id = $id
+    `).run({ $id: objectID });
+
+    return result.changes > 0;
 }
 
 /**

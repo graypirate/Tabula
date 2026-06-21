@@ -2,11 +2,11 @@ import type { Database } from "bun:sqlite";
 
 import type { Block, BlockID, BlockMetadata } from "../types/block";
 import type { DBMetadata } from "../types/database";
-import type { Entity, EntityReference } from "../types/entity";
+import type { Entity, EntityReference } from "../types/graph";
 import type { Obj, ObjID, ObjMetadata } from "../types/object";
 import {
-    deleteStoredBlock,
     getBlockMetadata,
+    getStoredBlock,
     insertStoredBlock,
     isStoredBlock,
     upsertStoredBlock,
@@ -14,26 +14,28 @@ import {
 import {
     appendEntityChild,
     appendDatabaseRootObject,
-    deleteStoredEntitySubtree,
     detachEntityParent,
     getDatabaseRootObjects,
     getDirectEntityChildren,
+    getDirectEntityChildIDs,
     getEntityParent,
-    getEntityType,
-    isStoredEntity,
-    readStoredEntityTree,
-    readStoredBlockTree,
-    readStoredObjectTree,
     replaceEntityChildren,
-} from "./db/entities";
+} from "./db/edges";
 import {
     getDatabaseMetadata,
     initDatabase,
     openDatabase as openStoredDatabase,
 } from "./db/init";
 import {
-    deleteStoredObject,
+    deleteStoredNodes,
+    getStoredNodeType,
+    insertStoredNode,
+    isStoredNode,
+    upsertStoredNode,
+} from "./db/nodes";
+import {
     getObjectMetadata,
+    getStoredObject,
     insertStoredObject,
     isStoredObject,
     upsertStoredObject,
@@ -63,19 +65,15 @@ export interface SearchResult {
     label: string;
 }
 
-export interface EntityList {
-    metadata: ObjMetadata | BlockMetadata;
-    parentID: StoredEntityID | null;
-    children: EntityReference[];
-}
-
 type SearchRow = SearchResult;
 
-export function initializeDatabaseStorage(path: string, name?: string): Database {
+// DB functionality
+
+export function initializeStorage(path: string, name?: string): Database {
     return initDatabase(path, name);
 }
 
-export function openDatabaseStorage(path: string): Database {
+export function openStorage(path: string): Database {
     return openStoredDatabase(path);
 }
 
@@ -83,12 +81,27 @@ export function readDatabaseMetadata(db: Database): DBMetadata {
     return getDatabaseMetadata(db);
 }
 
+// Creation and existence
+
+/**
+ * Create an entity with parent placement.
+ *
+ * Objects: parentID defaults to database root if unspecified.
+ * @param db
+ * @param entity
+ * @param parentID
+ */
 export function createEntity(
     db: Database,
     entity: StoredEntity,
     parentID?: StoredEntityID,
 ): void {
     const create = db.transaction(() => {
+        insertStoredNode(db, {
+            type: entity.type,
+            id: entity.id,
+        });
+
         if (entity.type === "object") {
             insertStoredObject(db, entity);
         } else {
@@ -126,19 +139,64 @@ export function blockExists(db: Database, blockID: BlockID): boolean {
 }
 
 export function entityExists(db: Database, id: string): boolean {
-    return isStoredEntity(db, id);
+    return isStoredNode(db, id);
 }
 
+// Read
+
 export function readObjectTree(db: Database, objectID: ObjID): Obj {
-    return readStoredObjectTree(db, objectID);
+    const type = getStoredNodeType(db, objectID);
+    if (type === undefined || type !== "object") {
+        throw new Error(`Object not found: ${objectID}`);
+    }
+    const entity = readEntityTree(db, objectID);
+    if (entity.type !== "object") {
+        throw new Error(`Object not found: ${objectID}`);
+    }
+    return entity;
 }
 
 export function readBlockTree(db: Database, blockID: BlockID): Block {
-    return readStoredBlockTree(db, blockID);
+    const type = getStoredNodeType(db, blockID);
+    if (type === undefined || type !== "block") {
+        throw new Error(`Block not found: ${blockID}`);
+    }
+    const entity = readEntityTree(db, blockID);
+    if (entity.type !== "block") {
+        throw new Error(`Block not found: ${blockID}`);
+    }
+    return entity;
 }
 
-export function readEntityTree(db: Database, entityID: string): Entity {
-    return readStoredEntityTree(db, entityID);
+export function readEntityTree(db: Database, entityID: string, visited: Set<string> = new Set()): Entity {
+    if (visited.has(entityID)) {
+        throw new Error(`Entity cycle detected at ${entityID}`);
+    }
+    visited.add(entityID);
+
+    const type = getStoredNodeType(db, entityID);
+    if (type === undefined) {
+        throw new Error(`Entity not found: ${entityID}`);
+    }
+    if (type === "database") {
+        throw new Error(`Database cannot be read as a public entity: ${entityID}`);
+    }
+
+    const children = getDirectEntityChildren(db, entityID).map((child) =>
+        readEntityTree(db, child.id, new Set(visited))
+    );
+
+    if (type === "object") {
+        return {
+            ...getStoredObject(db, entityID),
+            children,
+        };
+    }
+
+    return {
+        ...getStoredBlock(db, entityID),
+        children,
+    };
 }
 
 export function readDatabaseRootObjects(db: Database): ObjID[] {
@@ -153,8 +211,8 @@ export function readBlockMetadata(db: Database, blockID: BlockID): BlockMetadata
     return getBlockMetadata(db, blockID);
 }
 
-export function readDirectEntityChildren(db: Database, parentID: string): EntityReference[] {
-    return getDirectEntityChildren(db, parentID);
+export function readDirectEntityChildIDs(db: Database, parentID: string): StoredEntityID[] {
+    return getDirectEntityChildIDs(db, parentID) as StoredEntityID[];
 }
 
 export function readEntityParent(
@@ -168,26 +226,15 @@ export function readEntityParentID(db: Database, entityID: string): StoredEntity
     return readEntityParent(db, entityID)?.id ?? null;
 }
 
-export function listEntity(db: Database, entityID: string): EntityList {
-    const type = getEntityType(db, entityID);
-    if (type === undefined) {
-        throw new Error(`Entity not found: ${entityID}`);
-    }
-    if (type === "database") {
-        throw new Error(`Database cannot be listed as a public entity: ${entityID}`);
-    }
-
-    return {
-        metadata: type === "object"
-            ? getObjectMetadata(db, entityID)
-            : getBlockMetadata(db, entityID),
-        parentID: readEntityParentID(db, entityID),
-        children: getDirectEntityChildren(db, entityID),
-    };
-}
+// Insert and write
 
 export function persistEntityTree(db: Database, root: Entity): void {
     const visit = (entity: Entity): void => {
+        upsertStoredNode(db, {
+            type: entity.type,
+            id: entity.id,
+        });
+
         if (entity.type === "object") {
             upsertStoredObject(db, {
                 id: entity.id,
@@ -254,24 +301,44 @@ export function replaceDirectEntityChildren(
     replaceEntityChildren(db, desiredChildrenByParent);
 }
 
+// Deletion
+
 export function deleteObjectTree(db: Database, objectID: ObjID): boolean {
-    return deleteStoredObject(db, objectID);
+    const type = getStoredNodeType(db, objectID);
+    if (type === undefined) {
+        return false;
+    }
+    if (type !== "object") {
+        throw new Error(`Object not found: ${objectID}`);
+    }
+    return deleteEntityTree(db, objectID);
 }
 
 export function deleteBlockTree(db: Database, blockID: BlockID): boolean {
-    return deleteStoredBlock(db, blockID);
+    const type = getStoredNodeType(db, blockID);
+    if (type === undefined) {
+        return false;
+    }
+    if (type !== "block") {
+        throw new Error(`Block not found: ${blockID}`);
+    }
+    return deleteEntityTree(db, blockID);
 }
 
 export function deleteEntityTree(db: Database, entityID: string): boolean {
-    const type = getEntityType(db, entityID);
+    const type = getStoredNodeType(db, entityID);
     if (type === undefined) {
         return false;
     }
     if (type === "database") {
         throw new Error(`Database cannot be deleted as a public entity: ${entityID}`);
     }
-    return deleteStoredEntitySubtree(db, entityID);
+    const ids = collectEntitySubtreeIDs(db, entityID);
+    deleteStoredNodes(db, ids);
+    return true;
 }
+
+// Search functionality
 
 export function searchEntities(
     db: Database,
@@ -333,4 +400,24 @@ function buildChildMap(root: Entity): Map<string, EntityReference[]> {
 
     visit(root);
     return map;
+}
+
+/** Collects one entity and all of its recursive containment descendants. */
+function collectEntitySubtreeIDs(db: Database, rootID: string): string[] {
+    const ids: string[] = [];
+    const visited = new Set<string>();
+
+    const visit = (id: string): void => {
+        if (visited.has(id)) {
+            throw new Error(`Entity cycle detected at ${id}`);
+        }
+        visited.add(id);
+        ids.push(id);
+        for (const child of getDirectEntityChildren(db, id)) {
+            visit(child.id);
+        }
+    };
+
+    visit(rootID);
+    return ids;
 }

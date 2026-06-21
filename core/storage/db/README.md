@@ -1,7 +1,7 @@
 # Database Schema
 
 One SQLite database file represents one AgentDB database. The database contains
-one metadata row, a base `entities` table with a row for the database itself,
+one metadata row, a base `nodes` table with a row for the database itself,
 subtype tables for objects and blocks, and one ordered containment table.
 
 IDs are stable primary keys:
@@ -14,21 +14,21 @@ IDs are stable primary keys:
 
 ```sql
 CREATE TABLE "database" (
-    id TEXT PRIMARY KEY REFERENCES entities(id) ON DELETE RESTRICT,
+    id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE RESTRICT,
     name TEXT,
     schema_version TEXT NOT NULL
 );
 ```
 
-The table contains exactly one row, and that row has a matching `entities` row
+The table contains exactly one row, and that row has a matching `nodes` row
 with type `database`. The name is optional. New databases use schema version
-`0.2.0`. Initialization rejects databases whose metadata declares another
+`0.0.3`. Initialization rejects databases whose metadata declares another
 version; migrations are not currently supported.
 
-## Entities
+## Nodes
 
 ```sql
-CREATE TABLE entities (
+CREATE TABLE nodes (
     id TEXT PRIMARY KEY,
     type TEXT NOT NULL CHECK (type IN ('database', 'object', 'block'))
 );
@@ -42,7 +42,7 @@ remains in concrete tables.
 
 ```sql
 CREATE TABLE objects (
-    id TEXT PRIMARY KEY REFERENCES entities(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     properties TEXT NOT NULL DEFAULT '{}'
         CHECK (json_valid(properties))
@@ -50,7 +50,7 @@ CREATE TABLE objects (
 ```
 
 Objects do not store a parent column. Database roots are represented by
-`entity_children` rows whose parent is the database ID. Database roots must be
+`edges` rows whose parent is the database ID. Database roots must be
 objects. Moving an object to the database root removes its previous parent
 edge.
 
@@ -58,7 +58,7 @@ edge.
 
 ```sql
 CREATE TABLE blocks (
-    id TEXT PRIMARY KEY REFERENCES entities(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
     properties TEXT NOT NULL DEFAULT '{}'
         CHECK (json_valid(properties))
@@ -71,9 +71,9 @@ embedded in `content`; they are stored as containment edges.
 ## Containment
 
 ```sql
-CREATE TABLE entity_children (
-    parent_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
-    child_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+CREATE TABLE edges (
+    parent_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    child_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
     position INTEGER NOT NULL CHECK (position >= 0),
     PRIMARY KEY (parent_id, child_id),
     UNIQUE (child_id),
@@ -82,7 +82,7 @@ CREATE TABLE entity_children (
 );
 ```
 
-`entity_children` stores ordered containment edges. Each child entity has at
+`edges` stores ordered containment edges. Each child entity has at
 most one parent, enforced by `UNIQUE (child_id)`. Attaching an existing child
 under a new parent moves it by deleting its prior parent edge. Objects and
 blocks can both parent objects or blocks. The database may parent objects only;
@@ -105,10 +105,10 @@ SELECT * FROM blocks WHERE id = ?;
 Direct children are read from the parent index:
 
 ```sql
-SELECT * FROM entity_children WHERE parent_id = ? ORDER BY position;
+SELECT * FROM edges WHERE parent_id = ? ORDER BY position;
 ```
 
-Recursive reads walk `entity_children` and hydrate each child from its subtype
+Recursive reads walk `edges` and hydrate each child from its subtype
 table. Replacement writes treat submitted `children` arrays as complete for
 each submitted entity: omitted children are detached from that entity, but their
 entity records remain stored. When an existing entity is submitted under a new
