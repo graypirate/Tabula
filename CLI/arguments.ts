@@ -27,6 +27,7 @@ export type CLICommand =
     }
     | { action: "write"; workspace: string }
     | { action: "read"; workspace: string; id: string }
+    | { action: "listWorkspaces" }
     | { action: "list"; workspace: string; id: string }
     | { action: "delete"; workspace: string; id: string }
     | { action: "search"; workspace: string; query: string; type?: SearchType };
@@ -53,36 +54,14 @@ export function parseCommand(argv: string[]): CLICommand {
         throw inputError("INVALID_COMMAND", "Command is required");
     }
 
-    const workspace = requireSingleOption(parsed, "workspace");
-    validateCommandWorkspaceName(workspace);
-
     switch (action) {
-        case "init": {
-            requirePositionals(parsed, 1, "agentdb init --workspace NAME");
-            allowOptions(parsed, ["workspace"]);
-            return {
-                action,
-                workspace,
-            };
-        }
-
-        case "create":
-            return parseCreate(parsed, workspace);
-
-        case "write":
-            requirePositionals(parsed, 1, "agentdb write --workspace NAME < entity.json");
-            allowOptions(parsed, ["workspace"]);
-            return { action, workspace };
-
-        case "read": {
-            requirePositionals(parsed, 2, "agentdb read ID --workspace NAME");
-            allowOptions(parsed, ["workspace"]);
-            const id = parsed.positionals[1]!;
-            inferEntityType(id);
-            return { action, workspace, id };
-        }
-
         case "list": {
+            if (parsed.positionals.length === 1) {
+                allowOptions(parsed, []);
+                return { action: "listWorkspaces" };
+            }
+
+            const workspace = requireCommandWorkspace(parsed);
             requirePositionals(parsed, 2, "agentdb list ID --workspace NAME");
             allowOptions(parsed, ["workspace"]);
             const id = parsed.positionals[1]!;
@@ -91,7 +70,39 @@ export function parseCommand(argv: string[]): CLICommand {
             return { action, workspace, id };
         }
 
+        case "init": {
+            const workspace = requireCommandWorkspace(parsed);
+            requirePositionals(parsed, 1, "agentdb init --workspace NAME");
+            allowOptions(parsed, ["workspace"]);
+            return {
+                action,
+                workspace,
+            };
+        }
+
+        case "create": {
+            const workspace = requireCommandWorkspace(parsed);
+            return parseCreate(parsed, workspace);
+        }
+
+        case "write": {
+            const workspace = requireCommandWorkspace(parsed);
+            requirePositionals(parsed, 1, "agentdb write --workspace NAME < entity.json");
+            allowOptions(parsed, ["workspace"]);
+            return { action, workspace };
+        }
+
+        case "read": {
+            const workspace = requireCommandWorkspace(parsed);
+            requirePositionals(parsed, 2, "agentdb read ID --workspace NAME");
+            allowOptions(parsed, ["workspace"]);
+            const id = parsed.positionals[1]!;
+            inferEntityType(id);
+            return { action, workspace, id };
+        }
+
         case "delete": {
+            const workspace = requireCommandWorkspace(parsed);
             requirePositionals(parsed, 2, "agentdb delete ID --workspace NAME");
             allowOptions(parsed, ["workspace"]);
             const id = parsed.positionals[1]!;
@@ -102,6 +113,7 @@ export function parseCommand(argv: string[]): CLICommand {
         }
 
         case "search": {
+            const workspace = requireCommandWorkspace(parsed);
             requirePositionals(
                 parsed,
                 2,
@@ -237,6 +249,12 @@ function validateCommandWorkspaceName(workspace: string): void {
         }
         throw error;
     }
+}
+
+function requireCommandWorkspace(parsed: ParsedArguments): string {
+    const workspace = requireSingleOption(parsed, "workspace");
+    validateCommandWorkspaceName(workspace);
+    return workspace;
 }
 
 function allowOptions(parsed: ParsedArguments, allowed: string[]): void {

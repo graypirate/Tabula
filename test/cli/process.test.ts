@@ -22,6 +22,17 @@ afterEach(() => {
 });
 
 describe("CLI process output", () => {
+    test("lists managed workspace names", async () => {
+        const firstWorkspace = createWorkspaceName("beta");
+
+        expect(await successfulJSON<string[]>(["list"])).toEqual([]);
+
+        await successfulJSON<WorkspaceMetadata>(["init", "--workspace", firstWorkspace]);
+        await successfulJSON<WorkspaceMetadata>(["init", "--workspace", "alpha"]);
+
+        expect(await successfulJSON<string[]>(["list"])).toEqual(["alpha", "beta"]);
+    });
+
     test("executes the complete recursive entity workflow across processes", async () => {
         const workspaceName = createWorkspaceName();
 

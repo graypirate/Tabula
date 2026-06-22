@@ -9,7 +9,7 @@ AgentDB operates on workspaces.
 Workspaces are structured containers of flexible entities called Objects and Blocks. Objects and Blocks may parent one antoher in a recurisve/tree manner.
 
 
-Every command invoking a workspace requires `--workspace NAME`.
+Commands that operate inside one workspace require `--workspace NAME`.
 The package initializes managed storage at `~/.agentdb`, and workspaces resolve
 to `~/.agentdb/<name>.sqlite`. Clients pass names, not SQLite paths.
 
@@ -34,6 +34,7 @@ agentdb init --workspace NAME
 agentdb create ENTITY_TYPE --workspace NAME [--name OBJECT_NAME | --content TEXT] [--parent ID] [--property key=value]
 agentdb write --workspace NAME < entity.json
 agentdb read ID --workspace NAME
+agentdb list
 agentdb list ID --workspace NAME
 agentdb search QUERY --workspace NAME [--type object|block]
 agentdb delete ID --workspace NAME
@@ -59,9 +60,10 @@ string | null, "entity": ... }` with the full recursive entity tree. For a
 workspace ID, it returns workspace metadata only when the ID matches the opened
 workspace.
 
-`list` returns only direct child IDs. Workspace IDs list root object IDs. Object
-and block IDs list their ordered direct children. Use it for lightweight shape
-inspection before reading full trees.
+`list` without arguments returns all available workspace names.
+`list ID --workspace NAME` returns root children IDs.
+Listing Objects and Blocks return their ordered direct children.
+Use entity listing for lightweight shape inspection before reading full trees.
 
 `search` checks object names/properties and block content/properties. Use
 `--type object|block` to restrict results. Search returns compact matches with
@@ -91,9 +93,7 @@ block in the public recursive shape:
 }
 ```
 
-Objects allow only `id`, `type`, `name`, `properties`, and `children`. Blocks
-allow only `id`, `type`, `content`, `properties`, and `children`. `children` is
-required. `properties` is optional.
+Unlike Objects, Blocks do not have names, only `id`, `properties`, `content`, and `children`.
 
 An ID should only be passed for existing entities you wish to overwrite completely. New entities must not include an ID field whatsoever.
 
@@ -102,7 +102,7 @@ complete ordered child list for each submitted entity. Omitted children are
 detached from that parent, but not deleted. Supplying an existing child ID moves that
 entity into the submitted tree. Entities may only have one parent.
 
-## Output Rules
+## Output
 
 Successful commands write one compact JSON value plus a newline to stdout and
 exit `0`. Errors write structured JSON to stderr and never to stdout.

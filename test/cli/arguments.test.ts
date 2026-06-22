@@ -51,6 +51,10 @@ describe("CLI argument parsing", () => {
     });
 
     test("parses entity commands and search filters", () => {
+        expect(parseCommand(["list"])).toEqual({
+            action: "listWorkspaces",
+        });
+
         expect(parseCommand([
             "list",
             "b_example",

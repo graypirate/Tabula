@@ -1,11 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
     initializePackageStorage,
     InvalidWorkspaceNameError,
+    getWorkspaceNames,
     resolveInitializedWorkspaceDatabasePath,
     resolveWorkspaceDatabasePath,
     validateWorkspaceName,
@@ -53,6 +54,21 @@ test("initializes package storage idempotently", () => {
     expect(initializePackageStorage()).toBe(directory);
     expect(resolveInitializedWorkspaceDatabasePath("agent")).toBe(join(directory, "agent.sqlite"));
     expect(existsSync(join(directory, "agent.sqlite"))).toBe(false);
+});
+
+test("lists valid managed workspace names", () => {
+    useTempHome();
+
+    expect(getWorkspaceNames()).toEqual([]);
+
+    const directory = initializePackageStorage();
+    writeFileSync(join(directory, "beta.sqlite"), "");
+    writeFileSync(join(directory, "alpha.sqlite"), "");
+    writeFileSync(join(directory, "alpha.sqlite-wal"), "");
+    writeFileSync(join(directory, ".hidden.sqlite"), "");
+    mkdirSync(join(directory, "nested.sqlite"));
+
+    expect(getWorkspaceNames()).toEqual(["alpha", "beta"]);
 });
 
 function useTempHome(): void {

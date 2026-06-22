@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { type Dirent, mkdirSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -40,6 +40,28 @@ export function resolveInitializedWorkspaceDatabasePath(name: string): string {
     return resolveWorkspaceDatabasePath(name);
 }
 
+export function getWorkspaceNames(): string[] {
+    let entries: Dirent[];
+    try {
+        entries = readdirSync(workspaceDirectory(), { withFileTypes: true });
+    } catch (error) {
+        if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+            return [];
+        }
+        throw error;
+    }
+
+    return entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(DatabaseExtension))
+        .map((entry) => entry.name.slice(0, -DatabaseExtension.length))
+        .filter(isValidWorkspaceName)
+        .sort();
+}
+
 export function workspaceDirectory(): string {
     return join(process.env.HOME ?? homedir(), WorkspaceDirectoryName);
+}
+
+function isValidWorkspaceName(name: string): boolean {
+    return WorkspaceNamePattern.test(name);
 }

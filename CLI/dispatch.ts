@@ -10,6 +10,7 @@ import {
     search,
     writeEntity,
 } from "../index.ts";
+import { getWorkspaceNames } from "../core/workspace";
 import { inferEntityType, type CLICommand } from "./arguments.ts";
 import { CLIInputError, CLIOperationError } from "./errors.ts";
 import type { WriteInput } from "./json.ts";
@@ -23,6 +24,9 @@ export function dispatchCommand(command: CLICommand, writeInput?: WriteInput): u
             command.workspace,
             readWorkspace,
         );
+    }
+    if (command.action === "listWorkspaces") {
+        return getWorkspaceNames();
     }
 
     const properties = command.action === "create"
