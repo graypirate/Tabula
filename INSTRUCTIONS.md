@@ -113,3 +113,35 @@ errors exit `1`.
 ```json
 {"error":{"code":"MISSING_OPTION","message":"Required option missing: --workspace"}}
 ```
+
+## Usage Conventions
+
+Use Objects for named containers and Blocks for ordered content. Use
+`properties` for structure, labels, types, references, and values that should be
+inspected without parsing `content`.
+
+Keep content in one Block when it is usually read, written, moved, or deleted as
+one coherent piece.
+
+Create more Blocks only when a smaller unit needs its own ID, metadata,
+children, replacement, or move operation.
+
+Nest Blocks only for durable structure, not visual formatting. Prefer shallow
+trees for logs, tables, flat notes, and append-only collections; use deeper
+trees for documents, outlines, tasks, and grouped records.
+
+Sibling array order is the ordering/display contract.
+
+Examples:
+
+- Spreadsheet/database: use one Object for the table. Store column definitions
+  on the Object `properties`. Use one child Block per row/page. Store column
+  values on each row Block's `properties`, either under a `columns` key or
+  directly as column-keyed properties. Use row Block `content` only for
+  information outside the parent-defined columns, such as notes or freeform page
+  text.
+
+- Document: use one Object for the document. Use Blocks for sections,
+  paragraphs, list items, or embedded data when those parts need separate
+  operations or metadata. Keep the document in fewer Blocks when it is normally
+  read and written as one continuous piece.
