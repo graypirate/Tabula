@@ -3,7 +3,7 @@
 import { parseCommand } from "./arguments.ts";
 import { dispatchCommand } from "./dispatch.ts";
 import { CLIInputError, CLIOperationError } from "./errors.ts";
-import { readStdin } from "./io.ts";
+import { confirmationDialogue, readStdin } from "./io.ts";
 import { parseWriteInput } from "./json.ts";
 
 type ErrorOutput = {
@@ -18,11 +18,18 @@ export async function runCLI(
     argv: string[],
     read: () => Promise<string> = () => Bun.stdin.text(),
     isTTY: boolean | undefined = process.stdin.isTTY,
+    confirm: (prompt: string) => Promise<boolean> = (prompt) => confirmationDialogue(prompt, { isTTY }),
 ): Promise<{ exitCode: number; output: unknown; stream: "stdout" | "stderr" }> {
     try {
         const command = parseCommand(argv);
         const input = await readStdin(command.action === "write", isTTY, read);
         const writeInput = command.action === "write" ? parseWriteInput(input) : undefined;
+        if (command.action === "delete") {
+            const target = command.id ?? command.workspace;
+            if (!await confirm(`Delete ${target}?`)) {
+                return success(false);
+            }
+        }
         return success(dispatchCommand(command, writeInput));
     } catch (error) {
         return failure(error);

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -31,6 +31,26 @@ describe("CLI process output", () => {
         await successfulJSON<WorkspaceMetadata>(["init", "--workspace", "alpha"]);
 
         expect(await successfulJSON<string[]>(["list"])).toEqual(["alpha", "beta"]);
+
+        const betaPath = join(tempDirectory!, ".agentdb", `${firstWorkspace}.sqlite`);
+        writeFileSync(`${betaPath}-wal`, "");
+        writeFileSync(`${betaPath}-shm`, "");
+
+        expect(await successfulJSON<boolean>(["delete", "--workspace", firstWorkspace])).toBe(true);
+        expect(existsSync(betaPath)).toBe(false);
+        expect(existsSync(`${betaPath}-wal`)).toBe(false);
+        expect(existsSync(`${betaPath}-shm`)).toBe(false);
+        expect(await successfulJSON<string[]>(["list"])).toEqual(["alpha"]);
+
+        const missingDelete = await spawnCLI(["delete", "--workspace", firstWorkspace]);
+        expect(missingDelete.exitCode).toBe(1);
+        expect(missingDelete.stdout).toBe("");
+        expect(JSON.parse(missingDelete.stderr)).toMatchObject({
+            error: {
+                code: "WORKSPACE_DELETE_FAILED",
+                message: `Workspace not found: ${firstWorkspace}`,
+            },
+        });
     });
 
     test("executes the complete recursive entity workflow across processes", async () => {

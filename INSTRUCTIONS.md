@@ -39,6 +39,7 @@ agentdb list
 agentdb list --workspace NAME
 agentdb list ID --workspace NAME
 agentdb search QUERY --workspace NAME [--type object|block]
+agentdb delete --workspace NAME
 agentdb delete ID --workspace NAME
 ```
 
@@ -72,9 +73,14 @@ Use entity listing for lightweight shape inspection before reading full trees.
 `--type object|block` to restrict results. Search returns compact matches with
 type, ID, and label; use `read` afterward for full content.
 
-`delete` removes an object or block and its descendants, returning `true` when
-an entity was deleted and `false` when no matching entity existed. Workspace
-deletion is not supported.
+`delete --workspace NAME` deletes the managed workspace SQLite file and SQLite
+sidecar files, returning `true`; it errors when the workspace does not exist.
+`delete ID --workspace NAME` removes an object or block and its descendants,
+returning `true` when an entity was deleted and `false` when no matching entity
+existed.
+In interactive terminals, delete commands ask for confirmation. Answer `y` or
+`yes` to proceed; any other answer cancels and returns `false`. Non-interactive
+delete commands do not prompt.
 
 ## Stdin
 

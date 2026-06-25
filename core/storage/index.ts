@@ -117,10 +117,6 @@ export function createEntity(
     create();
 }
 
-export function createRootObject(db: Database, object: StoredObject): void {
-    createEntity(db, object, getDatabaseMetadata(db).id);
-}
-
 export function objectExists(db: Database, objectID: ObjID): boolean {
     return isStoredObject(db, objectID);
 }

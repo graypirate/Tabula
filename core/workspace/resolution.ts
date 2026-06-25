@@ -1,4 +1,4 @@
-import { type Dirent, mkdirSync, readdirSync } from "node:fs";
+import { type Dirent, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -17,6 +17,14 @@ export class InvalidWorkspaceNameError extends Error {
     }
 }
 
+export class WorkspaceNotFoundError extends Error {
+    override readonly name = "WorkspaceNotFoundError";
+
+    constructor(readonly workspaceName: string) {
+        super(`Workspace not found: ${workspaceName}`);
+    }
+}
+
 export function initializePackageStorage(): string {
     const directory = workspaceDirectory();
     mkdirSync(directory, { recursive: true });
@@ -32,6 +40,25 @@ export function validateWorkspaceName(name: string): void {
 export function resolveWorkspaceDatabasePath(name: string): string {
     validateWorkspaceName(name);
     return join(workspaceDirectory(), `${name}${DatabaseExtension}`);
+}
+
+export function deleteWorkspaceFiles(name: string): boolean {
+    const databasePath = resolveWorkspaceDatabasePath(name);
+    if (!existsSync(databasePath)) {
+        throw new WorkspaceNotFoundError(name);
+    }
+
+    let deleted = false;
+
+    for (const path of workspaceFilePaths(databasePath)) {
+        if (!existsSync(path)) {
+            continue;
+        }
+        rmSync(path, { force: true });
+        deleted = true;
+    }
+
+    return deleted;
 }
 
 export function resolveInitializedWorkspaceDatabasePath(name: string): string {
@@ -64,4 +91,13 @@ export function workspaceDirectory(): string {
 
 function isValidWorkspaceName(name: string): boolean {
     return WorkspaceNamePattern.test(name);
+}
+
+function workspaceFilePaths(databasePath: string): string[] {
+    return [
+        databasePath,
+        `${databasePath}-wal`,
+        `${databasePath}-shm`,
+        `${databasePath}-journal`,
+    ];
 }

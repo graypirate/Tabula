@@ -3,6 +3,17 @@ import type { Database } from "bun:sqlite";
 import { deleteEntityTree } from "../core/storage";
 import type { BlockID } from "../core/types/block";
 import type { ObjID } from "../core/types/object";
+import { deleteWorkspaceFiles } from "../core/workspace";
+
+/**
+ * Deletes the managed SQLite files for a workspace name.
+ * @param workspace - Managed workspace name
+ * @returns True when the workspace was deleted
+ * @throws If the workspace does not exist
+ */
+export function deleteWorkspace(workspace: string): boolean {
+    return deleteWorkspaceFiles(workspace);
+}
 
 /**
  * Deletes an object or block and its recursive containment subtree.

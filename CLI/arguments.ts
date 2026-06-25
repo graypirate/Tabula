@@ -29,7 +29,7 @@ export type CLICommand =
     | { action: "read"; workspace: string; id?: string }
     | { action: "listWorkspaces" }
     | { action: "list"; workspace: string; id?: string }
-    | { action: "delete"; workspace: string; id: string }
+    | { action: "delete"; workspace: string; id?: string }
     | { action: "search"; workspace: string; query: string; type?: SearchType };
 
 type ParsedArguments = {
@@ -128,11 +128,22 @@ export function parseCommand(argv: string[]): CLICommand {
 
         case "delete": {
             const workspace = requireCommandWorkspace(parsed);
-            requirePositionals(parsed, 2, "agentdb delete ID --workspace NAME");
+            if (parsed.positionals.length > 2) {
+                throw inputError(
+                    "INVALID_ARGUMENTS",
+                    "Usage: agentdb delete [ID] --workspace NAME",
+                );
+            }
             allowOptions(parsed, ["workspace"]);
-            const id = parsed.positionals[1]!;
+            const id = parsed.positionals[1];
+            if (id === undefined) {
+                return { action, workspace };
+            }
             if (inferEntityType(id) === "workspace") {
-                throw inputError("UNSUPPORTED_DELETE", "Workspace deletion is not supported");
+                throw inputError(
+                    "UNSUPPORTED_DELETE",
+                    "Delete workspaces by name: agentdb delete --workspace NAME",
+                );
             }
             return { action, workspace, id };
         }

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+    deleteWorkspaceFiles,
     initializePackageStorage,
     InvalidWorkspaceNameError,
     getWorkspaceNames,
@@ -69,6 +70,29 @@ test("lists valid managed workspace names", () => {
     mkdirSync(join(directory, "nested.sqlite"));
 
     expect(getWorkspaceNames()).toEqual(["alpha", "beta"]);
+});
+
+test("deletes managed workspace files without globbing neighboring paths", () => {
+    useTempHome();
+
+    const directory = initializePackageStorage();
+    const workspacePath = join(directory, "agent.sqlite");
+    const walPath = `${workspacePath}-wal`;
+    const shmPath = `${workspacePath}-shm`;
+    const journalPath = `${workspacePath}-journal`;
+    const backupPath = `${workspacePath}.backup`;
+
+    for (const path of [workspacePath, walPath, shmPath, journalPath, backupPath]) {
+        writeFileSync(path, "");
+    }
+
+    expect(deleteWorkspaceFiles("agent")).toBe(true);
+    expect(existsSync(workspacePath)).toBe(false);
+    expect(existsSync(walPath)).toBe(false);
+    expect(existsSync(shmPath)).toBe(false);
+    expect(existsSync(journalPath)).toBe(false);
+    expect(existsSync(backupPath)).toBe(true);
+    expect(() => deleteWorkspaceFiles("agent")).toThrow("Workspace not found: agent");
 });
 
 function useTempHome(): void {

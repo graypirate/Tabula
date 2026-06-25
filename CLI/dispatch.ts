@@ -1,6 +1,7 @@
 import {
     create,
     deleteEntity as deleteAPIEntity,
+    deleteWorkspace,
     initializeWorkspace,
     listEntity as listAPIEntity,
     listWorkspace,
@@ -27,6 +28,15 @@ export function dispatchCommand(command: CLICommand, writeInput?: WriteInput): u
     }
     if (command.action === "listWorkspaces") {
         return getWorkspaceNames();
+    }
+    if (command.action === "delete" && command.id === undefined) {
+        try {
+            return deleteWorkspace(command.workspace);
+        } catch (error) {
+            throw operationError("WORKSPACE_DELETE_FAILED", error, {
+                workspace: command.workspace,
+            });
+        }
     }
 
     const properties = command.action === "create"
@@ -80,6 +90,9 @@ export function dispatchCommand(command: CLICommand, writeInput?: WriteInput): u
                     ? listWorkspace(db)
                     : listCommandEntity(db, command.id);
             case "delete":
+                if (command.id === undefined) {
+                    throw new Error("Validated delete entity ID is required");
+                }
                 return deleteCommandEntity(db, command.id);
             case "search":
                 return search(db, command.query, command.type);

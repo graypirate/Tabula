@@ -70,6 +70,11 @@ describe("CLI argument parsing", () => {
             workspace: "agent",
         });
 
+        expect(parseCommand(["delete", "--workspace", "agent"])).toEqual({
+            action: "delete",
+            workspace: "agent",
+        });
+
         expect(parseCommand([
             "list",
             "b_example",
