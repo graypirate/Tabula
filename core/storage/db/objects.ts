@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 
+import type { JSONRecord } from "../../types/json";
 import type { ObjID, ObjMetadata } from "../../types/object";
 import { ObjectPrefix } from "../../utils/id";
 import type { StoredObject } from "../types";
@@ -66,7 +67,7 @@ export function getObjectMetadata(db: Database, objectID: ObjID): ObjMetadata {
         id: row.id,
         type: "object",
         name: row.name,
-        properties: JSON.parse(row.properties) as Record<string, unknown>,
+        properties: JSON.parse(row.properties) as JSONRecord,
     };
 }
 

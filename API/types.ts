@@ -3,14 +3,15 @@ import type { Entity, EntityParentID } from "../core/types/graph";
 import type { Obj, ObjID } from "../core/types/object";
 
 export type { EntityParentID } from "../core/types/graph";
+export type { JSONPrimitive, JSONRecord, JSONValue } from "../core/types/json";
 
 // Create types
+
+export type Create = ObjectCreate | BlockCreate;
 
 export type ObjectCreate = Omit<Obj, "id" | "children">;
 
 export type BlockCreate = Omit<Block, "id" | "children">;
-
-export type Create = ObjectCreate | BlockCreate;
 
 // Read types
 

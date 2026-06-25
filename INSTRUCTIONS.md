@@ -33,8 +33,10 @@ Entity IDs determine type:
 agentdb init --workspace NAME
 agentdb create ENTITY_TYPE --workspace NAME [--name OBJECT_NAME | --content TEXT] [--parent ID] [--property key=value]
 agentdb write --workspace NAME < entity.json
+agentdb read --workspace NAME
 agentdb read ID --workspace NAME
 agentdb list
+agentdb list --workspace NAME
 agentdb list ID --workspace NAME
 agentdb search QUERY --workspace NAME [--type object|block]
 agentdb delete ID --workspace NAME
@@ -55,14 +57,14 @@ otherwise they remain strings. Duplicate property keys are invalid.
 or replaces that entity tree. Use it for nested writes, full replacements, or
 moving existing entities by ID.
 
-`read` returns stored data. For object and block IDs, it returns `{ "parentID":
-string | null, "entity": ... }` with the full recursive entity tree. For a
-workspace ID, it returns workspace metadata only when the ID matches the opened
-workspace.
+`read --workspace NAME` returns workspace metadata. `read ID --workspace NAME`
+returns stored data. For object and block IDs, it returns `{ "parentID": string
+| null, "entity": ... }` with the full recursive entity tree. For a workspace
+ID, it returns workspace metadata only when the ID matches the opened workspace.
 
 `list` without arguments returns all available workspace names.
-`list ID --workspace NAME` returns root children IDs.
-Listing Objects and Blocks return their ordered direct children.
+`list --workspace NAME` returns the workspace's ordered root object IDs.
+`list ID --workspace NAME` returns an Object or Block's ordered direct children.
 Use entity listing for lightweight shape inspection before reading full trees.
 
 `search` checks object names/properties and block content/properties. Use

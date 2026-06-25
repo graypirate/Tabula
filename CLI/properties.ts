@@ -1,6 +1,7 @@
+import type { JSONRecord, JSONValue } from "../index.ts";
 import { CLIInputError } from "./errors.ts";
 
-export type Properties = Record<string, unknown>;
+export type Properties = JSONRecord;
 
 export function parseProperties(values: string[]): Properties {
     const properties: Properties = {};
@@ -21,7 +22,7 @@ export function parseProperties(values: string[]): Properties {
 
         const value = property.slice(separator + 1);
         try {
-            properties[key] = JSON.parse(value) as unknown;
+            properties[key] = JSON.parse(value) as JSONValue;
         } catch {
             properties[key] = value;
         }

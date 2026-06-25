@@ -66,9 +66,13 @@ export function dispatchCommand(command: CLICommand, writeInput?: WriteInput): u
                 }
                 return writeEntity(db, writeInput.value);
             case "read":
-                return readCommandEntity(db, command.id);
+                return command.id === undefined
+                    ? readWorkspace(db)
+                    : readCommandEntity(db, command.id);
             case "list":
-                return listCommandEntity(db, command.id);
+                return command.id === undefined
+                    ? listWorkspace(db)
+                    : listCommandEntity(db, command.id);
             case "delete":
                 return deleteCommandEntity(db, command.id);
             case "search":

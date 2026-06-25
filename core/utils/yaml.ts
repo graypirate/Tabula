@@ -1,14 +1,18 @@
 import YAML from "yaml";
 
+import type { JSONRecord } from "../types/json";
 import type { ObjMetadata } from "../types/object";
 
 // HELPER - convert frontmatter to a dictionary
-function frontmatterToDict(frontmatter: ObjMetadata): Record<string, unknown> {
-    return {
+function frontmatterToDict(frontmatter: ObjMetadata): JSONRecord {
+    const result: JSONRecord = {
         id: frontmatter.id,
         name: frontmatter.name,
-        properties: frontmatter.properties,
     };
+    if (frontmatter.properties !== undefined) {
+        result.properties = frontmatter.properties;
+    }
+    return result;
 }
 
 export function renderFrontmatter(frontmatter: ObjMetadata): string {

@@ -8,6 +8,7 @@ import {
     readEntityTree,
 } from "../core/storage";
 import type { Entity } from "../core/types/graph";
+import type { JSONRecord } from "../core/types/json";
 import { createBlockID, createObjID } from "../core/utils/id";
 import {
     type BlockResult,
@@ -48,7 +49,7 @@ export function create(
 export function createObject(
     db: Database,
     name: string,
-    properties: Record<string, unknown> = {},
+    properties: JSONRecord = {},
     options: CreateOptions = {},
 ): ObjectResult {
     const result = create(db, {
@@ -71,7 +72,7 @@ export function createObject(
 export function createBlock(
     db: Database,
     content: string,
-    properties: Record<string, unknown> = {},
+    properties: JSONRecord = {},
     options: CreateOptions = {},
 ): BlockResult {
     const result = create(db, {

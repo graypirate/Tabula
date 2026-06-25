@@ -1,5 +1,6 @@
 import type {
     BlockWrite,
+    JSONRecord,
     Write,
     ObjectWrite,
 } from "../index.ts";
@@ -9,7 +10,7 @@ export type WriteInput =
     | { entity: "block"; value: BlockWrite }
     | { entity: "object"; value: ObjectWrite };
 
-type JSONObject = Record<string, unknown>;
+type JSONObject = JSONRecord;
 
 const blockFields = new Set(["id", "type", "content", "properties", "children"]);
 const objectFields = new Set(["id", "type", "name", "properties", "children"]);
@@ -161,7 +162,7 @@ function optionalID(
 function optionalProperties(
     value: JSONObject,
     path: string,
-): { properties?: Record<string, unknown> } {
+): { properties?: JSONRecord } {
     if (!Object.hasOwn(value, "properties")) {
         return {};
     }

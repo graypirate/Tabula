@@ -47,6 +47,11 @@ describe("CLI process output", () => {
             schemaVersion: "0.0.3",
         });
         expect(existsSync(join(tempDirectory!, ".agentdb", `${workspaceName}.sqlite`))).toBe(true);
+        expect(await successfulJSON<WorkspaceMetadata>([
+            "read",
+            "--workspace",
+            workspaceName,
+        ])).toEqual(initialized);
 
         const emptyObjectResult = await successfulJSON<Result<Obj>>([
             "create",
@@ -159,7 +164,6 @@ describe("CLI process output", () => {
 
         const workspaceList = await successfulJSON<string[]>([
             "list",
-            initialized.id,
             "--workspace",
             workspaceName,
         ]);
@@ -235,15 +239,15 @@ describe("CLI process output", () => {
 
     test("supports concurrent reads and closes every process connection", async () => {
         const workspaceName = createWorkspaceName();
-        const initialized = await successfulJSON<WorkspaceMetadata>([
+        await successfulJSON<WorkspaceMetadata>([
             "init",
             "--workspace",
             workspaceName,
         ]);
 
         const commands = [
-            ["read", initialized.id, "--workspace", workspaceName],
-            ["list", initialized.id, "--workspace", workspaceName],
+            ["read", "--workspace", workspaceName],
+            ["list", "--workspace", workspaceName],
             ["search", "missing", "--workspace", workspaceName],
         ];
         const results = await Promise.all(commands.map((arguments_) => spawnCLI(arguments_)));

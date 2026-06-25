@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 
 import type { BlockID, BlockMetadata } from "../../types/block";
+import type { JSONRecord } from "../../types/json";
 import { BlockPrefix } from "../../utils/id";
 import type { StoredBlock } from "../types";
 
@@ -79,7 +80,7 @@ export function getBlockMetadata(db: Database, blockID: BlockID): BlockMetadata 
     return {
         id: row.id,
         type: "block",
-        properties: JSON.parse(row.properties) as Record<string, unknown>,
+        properties: JSON.parse(row.properties) as JSONRecord,
     };
 }
 
@@ -103,8 +104,8 @@ export function getStoredBlock(db: Database, blockID: BlockID): StoredBlock {
     return {
         id: row.id,
         type: "block",
+        properties: JSON.parse(row.properties) as JSONRecord,
         content: row.content,
-        properties: JSON.parse(row.properties) as Record<string, unknown>,
     };
 }
 

@@ -55,6 +55,16 @@ describe("CLI argument parsing", () => {
             action: "listWorkspaces",
         });
 
+        expect(parseCommand(["list", "--workspace", "agent"])).toEqual({
+            action: "list",
+            workspace: "agent",
+        });
+
+        expect(parseCommand(["read", "--workspace", "agent"])).toEqual({
+            action: "read",
+            workspace: "agent",
+        });
+
         expect(parseCommand([
             "list",
             "b_example",

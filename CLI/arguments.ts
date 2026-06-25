@@ -26,9 +26,9 @@ export type CLICommand =
         parentID?: string;
     }
     | { action: "write"; workspace: string }
-    | { action: "read"; workspace: string; id: string }
+    | { action: "read"; workspace: string; id?: string }
     | { action: "listWorkspaces" }
-    | { action: "list"; workspace: string; id: string }
+    | { action: "list"; workspace: string; id?: string }
     | { action: "delete"; workspace: string; id: string }
     | { action: "search"; workspace: string; query: string; type?: SearchType };
 
@@ -56,18 +56,27 @@ export function parseCommand(argv: string[]): CLICommand {
 
     switch (action) {
         case "list": {
-            if (parsed.positionals.length === 1) {
+            if (parsed.positionals.length === 1 && !parsed.options.has("workspace")) {
                 allowOptions(parsed, []);
                 return { action: "listWorkspaces" };
             }
 
             const workspace = requireCommandWorkspace(parsed);
-            requirePositionals(parsed, 2, "agentdb list ID --workspace NAME");
+            if (parsed.positionals.length > 2) {
+                throw inputError(
+                    "INVALID_ARGUMENTS",
+                    "Usage: agentdb list [ID] --workspace NAME",
+                );
+            }
             allowOptions(parsed, ["workspace"]);
-            const id = parsed.positionals[1]!;
-            inferEntityType(id);
+            const id = parsed.positionals[1];
+            if (id !== undefined) {
+                inferEntityType(id);
+            }
 
-            return { action, workspace, id };
+            return id === undefined
+                ? { action, workspace }
+                : { action, workspace, id };
         }
 
         case "init": {
@@ -94,11 +103,20 @@ export function parseCommand(argv: string[]): CLICommand {
 
         case "read": {
             const workspace = requireCommandWorkspace(parsed);
-            requirePositionals(parsed, 2, "agentdb read ID --workspace NAME");
+            if (parsed.positionals.length > 2) {
+                throw inputError(
+                    "INVALID_ARGUMENTS",
+                    "Usage: agentdb read [ID] --workspace NAME",
+                );
+            }
             allowOptions(parsed, ["workspace"]);
-            const id = parsed.positionals[1]!;
-            inferEntityType(id);
-            return { action, workspace, id };
+            const id = parsed.positionals[1];
+            if (id !== undefined) {
+                inferEntityType(id);
+            }
+            return id === undefined
+                ? { action, workspace }
+                : { action, workspace, id };
         }
 
         case "delete": {

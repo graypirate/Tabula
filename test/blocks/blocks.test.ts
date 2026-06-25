@@ -24,6 +24,7 @@ import {
     readBlockTree,
 } from "../../core/storage";
 import type { StoredBlock } from "../../core/storage/types";
+import type { JSONRecord } from "../../core/types/json";
 
 let db: Database | undefined;
 
@@ -182,7 +183,7 @@ test("attaching an existing block under a new parent moves it", () => {
     expect(isStoredBlock(db, "b_moved")).toBe(true);
 });
 
-function block(id: string, content: string, properties?: Record<string, unknown>): StoredBlock {
+function block(id: string, content: string, properties?: JSONRecord): StoredBlock {
     return {
         id,
         type: "block",
