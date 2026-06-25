@@ -50,18 +50,13 @@ same value passed to `--workspace`.
 
 ### Quick Creation
 
-Create empty objects and standalone blocks using flags:
+Create empty objects and child blocks using flags:
 
 ```bash
 agentdb create object \
   --workspace workspace \
   --name "CLI Implementation" \
   --property priority=1
-
-agentdb create block \
-  --workspace workspace \
-  --content "Standalone block content" \
-  --property draft=true
 
 agentdb create block \
   --workspace workspace \
@@ -73,16 +68,15 @@ Repeat `--property key=value` to add properties. Values are parsed as JSON when
 valid, so numbers, booleans, arrays, objects, and quoted strings retain their
 types. Other values remain strings.
 
-Without `--parent`, `create object` creates a workspace-root object and `create
-block` creates a standalone block. `--parent ID` appends the created entity to
-an existing object or block. Objects may also use the workspace ID as their
-parent; blocks may not. Use `write` to create an object or block with nested
-content.
+Without `--parent`, `create object` creates a workspace-root object. Blocks
+require `--parent ID` and are appended under an existing object or block.
+Objects may also use the workspace ID as their parent; blocks may not. Use
+`write` to create an object or block with nested content.
 
 ### Write Objects And Blocks
 
-`write` reads one JSON object from stdin. It accepts either a recursive object
-or a standalone block:
+`write` reads one JSON object from stdin. Object roots may omit `--parent` and
+become workspace-root objects. Block roots require `--parent ID`:
 
 ```bash
 agentdb write --workspace workspace <<'JSON'
@@ -116,14 +110,14 @@ stored entity as `{ "parentID": "...", "entity": ... }`, so parent placement is
 top-level metadata and recursive children remain free of `parentID`.
 
 An omitted root ID creates an entity. A supplied root ID replaces that object or
-block:
+block. Block roots require `--parent ID`:
 
 ```bash
-agentdb write --workspace workspace <<'JSON'
+agentdb write --workspace workspace --parent o_parent <<'JSON'
 {
   "id": "b_example",
   "type": "block",
-  "content": "Updated standalone content",
+  "content": "Updated child content",
   "properties": {
     "version": 2
   },
@@ -132,11 +126,10 @@ agentdb write --workspace workspace <<'JSON'
 JSON
 ```
 
-Replacement is complete for every submitted entity's direct children: children
-omitted from the input are detached from that entity, but their entity records
-remain stored. Supplying an existing child ID moves that entity from its current
-parent into the submitted tree, updates it, and replaces that moved entity's
-submitted children.
+Replacement is complete for every submitted entity's direct children: omitted
+children are recursively deleted. Supplying an existing child ID moves that
+entity from its current parent into the submitted tree, updates it, and replaces
+that moved entity's submitted children.
 
 ### Read And List
 

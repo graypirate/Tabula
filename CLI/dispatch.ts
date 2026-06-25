@@ -64,7 +64,13 @@ export function dispatchCommand(command: CLICommand, writeInput?: WriteInput): u
                 if (writeInput === undefined) {
                     throw new Error("Validated write input is required");
                 }
-                return writeEntity(db, writeInput.value);
+                if (writeInput.entity === "block" && command.parentID === undefined) {
+                    throw new CLIInputError(
+                        "MISSING_OPTION",
+                        "Required option missing: --parent",
+                    );
+                }
+                return writeEntity(db, writeInput.value, createOptions(command.parentID));
             case "read":
                 return command.id === undefined
                     ? readWorkspace(db)

@@ -73,12 +73,17 @@ test("initializes and opens an existing managed workspace by name", () => {
 test("quick create functions return recursive public entities", () => {
     db = initializeStorage(":memory:");
     const objectResult = createObject(db, "AgentDB", { active: true });
-    const blockResult = createBlock(db, "Standalone", { kind: "text" });
+    const blockResult = createBlock(
+        db,
+        "Child",
+        { kind: "text" },
+        { parentID: objectResult.entity.id },
+    );
     const object = objectResult.entity;
     const block = blockResult.entity;
 
     expect(objectResult.parentID).toBe(readWorkspace(db).id);
-    expect(blockResult.parentID).toBeNull();
+    expect(blockResult.parentID).toBe(object.id);
     expect(object).toEqual({
         id: expect.stringMatching(/^o_/),
         type: "object",
@@ -89,13 +94,44 @@ test("quick create functions return recursive public entities", () => {
     expect(block).toEqual({
         id: expect.stringMatching(/^b_/),
         type: "block",
-        content: "Standalone",
+        content: "Child",
         properties: { kind: "text" },
         children: [],
     });
-    expect(readObject(db, object.id).entity).toEqual(object);
+    expect(readObject(db, object.id).entity).toEqual({
+        ...object,
+        children: [block],
+    });
     expect(readBlock(db, block.id).entity).toEqual(block);
     expect(listWorkspace(db)).toEqual([object.id]);
+});
+
+test("block roots require an explicit parent", () => {
+    db = initializeStorage(":memory:");
+    const object = createObject(db, "Parent").entity;
+
+    expect(() => createBlock(db!, "Missing parent")).toThrow("Block parent is required");
+    expect(() => create(db!, {
+        type: "block",
+        content: "Missing parent",
+        properties: {},
+    })).toThrow("Block parent is required");
+    expect(() => writeBlock(db!, {
+        type: "block",
+        content: "Missing parent",
+        properties: {},
+        children: [],
+    })).toThrow("Block parent is required");
+
+    const block = writeBlock(db, {
+        type: "block",
+        content: "Parented root",
+        properties: {},
+        children: [],
+    }, { parentID: object.id });
+
+    expect(block.parentID).toBe(object.id);
+    expect(listObject(db, object.id)).toEqual([block.entity.id]);
 });
 
 test("generic create can attach entities to a parent", () => {
@@ -160,7 +196,7 @@ test("read output can be written back without changing shape", () => {
     expect(readObject(db, created.id).entity).toEqual(created);
 });
 
-test("replacement writes detach omitted subtrees without deleting them", () => {
+test("replacement writes delete omitted subtrees", () => {
     db = initializeStorage(":memory:");
     const created = writeObject(db, objectWrite("Original")).entity;
     const omittedBlock = created.children[0]!;
@@ -175,12 +211,8 @@ test("replacement writes detach omitted subtrees without deleting them", () => {
     }).entity;
 
     expect(replaced.children).toEqual([]);
-    expect(readBlock(db, omittedBlock.id).entity.children.map((child) => child.id)).toEqual([omittedObject.id]);
-    expect(omittedObject.type).toBe("object");
-    if (omittedObject.type !== "object") {
-        throw new Error("Expected omitted child to be an object");
-    }
-    expect(readObject(db, omittedObject.id).entity).toEqual(omittedObject);
+    expect(() => readBlock(db!, omittedBlock.id)).toThrow("Entity not found");
+    expect(() => readObject(db!, omittedObject.id)).toThrow("Entity not found");
 });
 
 test("explicit IDs move existing entities into the submitted tree", () => {
@@ -249,7 +281,7 @@ test("submitted children replace a moved entity's existing children", () => {
     expect(readObject(db, first.id).entity.children).toEqual([]);
     expect(readObject(db, second.id).entity.children.map((child) => child.id)).toEqual([moved.id]);
     expect(readBlock(db, moved.id).entity.children).toEqual([]);
-    expect(readObject(db, oldChild.id).entity.children).toEqual([]);
+    expect(() => readObject(db!, oldChild.id)).toThrow("Entity not found");
 });
 
 test("entity-specific list functions return direct child IDs", () => {
@@ -264,11 +296,12 @@ test("entity-specific list functions return direct child IDs", () => {
     expect(listBlock(db, block.id)).toEqual([nested.id]);
 });
 
-test("standalone blocks can own children but are not workspace roots", () => {
+test("parented block root writes can own children", () => {
     db = initializeStorage(":memory:");
+    const object = createObject(db, "Parent").entity;
     const blockResult = writeBlock(db, {
         type: "block",
-        content: "Standalone root",
+        content: "Parented root",
         properties: {},
         children: [{
             type: "object",
@@ -276,12 +309,12 @@ test("standalone blocks can own children but are not workspace roots", () => {
             properties: {},
             children: [],
         }],
-    });
+    }, { parentID: object.id });
     const block = blockResult.entity;
 
-    expect(blockResult.parentID).toBeNull();
+    expect(blockResult.parentID).toBe(object.id);
     expect(readBlock(db, block.id).entity).toEqual(block);
-    expect(listWorkspace(db)).toEqual([]);
+    expect(listWorkspace(db)).toEqual([object.id]);
 });
 
 test("deleting an entity deletes its subtree", () => {
@@ -295,7 +328,8 @@ test("deleting an entity deletes its subtree", () => {
     expect(() => readBlock(db!, blockID)).toThrow();
     expect(() => readObject(db!, nestedObjectID)).toThrow();
 
-    const standalone = writeBlock(db, {
+    const parent = createObject(db, "Parent").entity;
+    const parented = writeBlock(db, {
         type: "block",
         content: "Parent",
         properties: {},
@@ -305,16 +339,16 @@ test("deleting an entity deletes its subtree", () => {
             properties: {},
             children: [],
         }],
-    }).entity;
-    const childID = standalone.children[0]!.id;
-    expect(deleteBlock(db, standalone.id)).toBe(true);
+    }, { parentID: parent.id }).entity;
+    const childID = parented.children[0]!.id;
+    expect(deleteBlock(db, parented.id)).toBe(true);
     expect(() => readBlock(db!, childID)).toThrow();
 });
 
 test("search supports an optional entity type parameter", () => {
     db = initializeStorage(":memory:");
     const object = createObject(db, "Needle object").entity;
-    const block = createBlock(db, "Needle block").entity;
+    const block = createBlock(db, "Needle block", {}, { parentID: object.id }).entity;
 
     expect(search(db, "needle").map((result) => result.id)).toEqual([
         block.id,

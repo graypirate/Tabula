@@ -33,7 +33,7 @@ afterEach(() => {
     db = undefined;
 });
 
-test("blocks support standalone CRUD", () => {
+test("blocks support row CRUD", () => {
     db = initDatabase(":memory:");
 
     insertStoredNode(db, { id: "b_one", type: "block" });

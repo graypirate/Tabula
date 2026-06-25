@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 
 import type { Block, BlockID, BlockMetadata } from "../types/block";
 import type { DBMetadata } from "../types/database";
-import type { Entity, EntityReference } from "../types/graph";
+import type { Entity, EntityID, EntityReference } from "../types/graph";
 import type { Obj, ObjID, ObjMetadata } from "../types/object";
 import {
     getBlockMetadata,
@@ -14,7 +14,6 @@ import {
 import {
     appendEntityChild,
     appendDatabaseRootObject,
-    detachEntityParent,
     getDatabaseRootObjects,
     getDirectEntityChildren,
     getDirectEntityChildIDs,
@@ -87,6 +86,7 @@ export function readDatabaseMetadata(db: Database): DBMetadata {
  * Create an entity with parent placement.
  *
  * Objects: parentID defaults to database root if unspecified.
+ * Blocks require an explicit object or block parent.
  * @param db
  * @param entity
  * @param parentID
@@ -108,15 +108,10 @@ export function createEntity(
             insertStoredBlock(db, entity);
         }
 
-        const desiredParentID = parentID
-            ?? (entity.type === "object" ? getDatabaseMetadata(db).id : undefined);
-
-        if (desiredParentID !== undefined) {
-            appendEntityChild(db, desiredParentID, {
-                type: entity.type,
-                id: entity.id,
-            });
-        }
+        appendEntityChild(db, resolveRootParentID(db, entity.type, parentID), {
+            type: entity.type,
+            id: entity.id,
+        });
     });
 
     create();
@@ -124,10 +119,6 @@ export function createEntity(
 
 export function createRootObject(db: Database, object: StoredObject): void {
     createEntity(db, object, getDatabaseMetadata(db).id);
-}
-
-export function createStandaloneBlock(db: Database, block: StoredBlock): void {
-    createEntity(db, block);
 }
 
 export function objectExists(db: Database, objectID: ObjID): boolean {
@@ -264,18 +255,16 @@ export function writeEntityTree(
 ): Entity {
     const write = db.transaction(() => {
         persistEntityTree(db, root);
-        const desiredParentID = parentID
-            ?? (root.type === "object" ? getDatabaseMetadata(db).id : undefined);
+        appendEntityChild(db, resolveRootParentID(db, root.type, parentID), {
+            type: root.type,
+            id: root.id,
+        });
 
-        if (desiredParentID !== undefined) {
-            appendEntityChild(db, desiredParentID, {
-                type: root.type,
-                id: root.id,
-            });
-        } else {
-            detachEntityParent(db, root.id);
-        }
-        replaceEntityChildren(db, buildChildMap(root));
+        const desiredChildrenByParent = buildChildMap(root);
+        const submittedIDs = collectSubmittedEntityIDs(root);
+        const omittedChildIDs = collectOmittedChildIDs(db, desiredChildrenByParent, submittedIDs);
+        replaceEntityChildren(db, desiredChildrenByParent);
+        deleteOmittedEntitySubtrees(db, omittedChildIDs);
     });
 
     write();
@@ -400,6 +389,67 @@ function buildChildMap(root: Entity): Map<string, EntityReference[]> {
 
     visit(root);
     return map;
+}
+
+/** Resolves public root placement. */
+function resolveRootParentID(
+    db: Database,
+    type: Entity["type"],
+    parentID?: StoredEntityID,
+): StoredEntityID {
+    if (parentID !== undefined) {
+        return parentID;
+    }
+    if (type === "object") {
+        return getDatabaseMetadata(db).id;
+    }
+    throw new Error("Block parent is required");
+}
+
+/** Collects every entity ID explicitly present in a submitted tree. */
+function collectSubmittedEntityIDs(root: Entity): Set<EntityID> {
+    const ids = new Set<EntityID>();
+
+    const visit = (entity: Entity): void => {
+        ids.add(entity.id);
+        entity.children.forEach(visit);
+    };
+
+    visit(root);
+    return ids;
+}
+
+/** Finds existing direct children that a replacement write omitted. */
+function collectOmittedChildIDs(
+    db: Database,
+    desiredChildrenByParent: Map<string, EntityReference[]>,
+    submittedIDs: Set<EntityID>,
+): EntityID[] {
+    const omitted = new Set<EntityID>();
+
+    for (const [parentID, desiredChildren] of desiredChildrenByParent) {
+        const desiredChildIDs = new Set(desiredChildren.map((child) => child.id));
+        for (const child of getDirectEntityChildren(db, parentID)) {
+            if (!desiredChildIDs.has(child.id) && !submittedIDs.has(child.id)) {
+                omitted.add(child.id);
+            }
+        }
+    }
+
+    return [...omitted];
+}
+
+/** Deletes omitted children after moved descendants have been reparented. */
+function deleteOmittedEntitySubtrees(db: Database, rootIDs: EntityID[]): void {
+    const deleted = new Set<string>();
+    for (const rootID of rootIDs) {
+        if (deleted.has(rootID) || getStoredNodeType(db, rootID) === undefined) {
+            continue;
+        }
+        const ids = collectEntitySubtreeIDs(db, rootID);
+        deleteStoredNodes(db, ids);
+        ids.forEach((id) => deleted.add(id));
+    }
 }
 
 /** Collects one entity and all of its recursive containment descendants. */

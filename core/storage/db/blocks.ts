@@ -6,7 +6,7 @@ import { BlockPrefix } from "../../utils/id";
 import type { StoredBlock } from "../types";
 
 /**
- * Inserts a standalone block row.
+ * Inserts a block row.
  * @param db - The database containing the block
  * @param block - The block metadata and content to insert
  */
@@ -20,7 +20,7 @@ export function insertStoredBlock(db: Database, block: StoredBlock): void {
 }
 
 /**
- * Inserts multiple standalone block rows atomically.
+ * Inserts multiple block rows atomically.
  * @param db - The database containing the blocks
  * @param blocks - The blocks to insert
  */

@@ -23,9 +23,9 @@ export type CLICommand =
         workspace: string;
         content: string;
         propertyValues: string[];
-        parentID?: string;
+        parentID: string;
     }
-    | { action: "write"; workspace: string }
+    | { action: "write"; workspace: string; parentID?: string }
     | { action: "read"; workspace: string; id?: string }
     | { action: "listWorkspaces" }
     | { action: "list"; workspace: string; id?: string }
@@ -96,9 +96,16 @@ export function parseCommand(argv: string[]): CLICommand {
 
         case "write": {
             const workspace = requireCommandWorkspace(parsed);
-            requirePositionals(parsed, 1, "agentdb write --workspace NAME < entity.json");
-            allowOptions(parsed, ["workspace"]);
-            return { action, workspace };
+            requirePositionals(
+                parsed,
+                1,
+                "agentdb write --workspace NAME [--parent ID] < entity.json",
+            );
+            allowOptions(parsed, ["workspace", "parent"]);
+            const parentID = optionalParentID(parsed);
+            return parentID === undefined
+                ? { action, workspace }
+                : { action, workspace, parentID };
         }
 
         case "read": {
@@ -196,14 +203,14 @@ function parseCreate(parsed: ParsedArguments, workspace: string): CLICommand {
 
         case "block": {
             allowOptions(parsed, ["workspace", "content", "parent", "property"]);
-            const parentID = optionalCreateParentID(parsed, entity);
+            const parentID = requireCreateParentID(parsed, entity);
             return {
                 action: "create",
                 entity,
                 workspace,
                 content: requireSingleOption(parsed, "content"),
                 propertyValues: parsed.options.get("property") ?? [],
-                ...(parentID === undefined ? {} : { parentID }),
+                parentID,
             };
         }
 
@@ -313,21 +320,42 @@ function optionalCreateParentID(
     parsed: ParsedArguments,
     childType: Exclude<EntityType, "workspace">,
 ): string | undefined {
-    const parentID = optionalSingleOption(parsed, "parent");
+    const parentID = optionalParentID(parsed);
     if (parentID === undefined) {
         return undefined;
     }
 
-    const parentType = inferEntityType(parentID);
-    if (childType === "block" && parentType === "workspace") {
-        throw inputError("INVALID_PARENT", `Workspace parents can only contain objects: ${parentID}`);
+    validateParentType(parentID, childType);
+    return parentID;
+}
+
+function requireCreateParentID(
+    parsed: ParsedArguments,
+    childType: Exclude<EntityType, "workspace">,
+): string {
+    const parentID = optionalParentID(parsed);
+    if (parentID === undefined) {
+        throw inputError("MISSING_OPTION", "Required option missing: --parent");
+    }
+
+    validateParentType(parentID, childType);
+    return parentID;
+}
+
+function optionalParentID(parsed: ParsedArguments): string | undefined {
+    const parentID = optionalSingleOption(parsed, "parent");
+    if (parentID !== undefined) {
+        inferEntityType(parentID);
     }
     return parentID;
 }
 
-function requireEntityType(id: string, expected: EntityType, code = "INVALID_ID"): void {
-    if (inferEntityType(id) !== expected) {
-        throw inputError(code, `Expected ${expected} ID: ${id}`);
+function validateParentType(
+    parentID: string,
+    childType: Exclude<EntityType, "workspace">,
+): void {
+    if (childType === "block" && inferEntityType(parentID) === "workspace") {
+        throw inputError("INVALID_PARENT", `Workspace parents can only contain objects: ${parentID}`);
     }
 }
 

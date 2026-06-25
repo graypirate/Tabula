@@ -48,6 +48,11 @@ describe("CLI argument parsing", () => {
             action: "write",
             workspace: "agent",
         });
+        expect(parseCommand(["write", "--workspace", "agent", "--parent", "o_parent"])).toEqual({
+            action: "write",
+            workspace: "agent",
+            parentID: "o_parent",
+        });
     });
 
     test("parses entity commands and search filters", () => {
@@ -113,6 +118,17 @@ describe("CLI argument parsing", () => {
                 "Invalid",
             ]),
             "INVALID_ENTITY_TYPE",
+        );
+        expectInputError(
+            () => parseCommand([
+                "create",
+                "block",
+                "--workspace",
+                "agent",
+                "--content",
+                "Invalid",
+            ]),
+            "MISSING_OPTION",
         );
         expectInputError(
             () => parseCommand([

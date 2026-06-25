@@ -86,8 +86,8 @@ CREATE TABLE edges (
 most one parent, enforced by `UNIQUE (child_id)`. Attaching an existing child
 under a new parent moves it by deleting its prior parent edge. Objects and
 blocks can both parent objects or blocks. The database may parent objects only;
-databases cannot be child entities, and standalone blocks have no database
-edge.
+databases cannot be child entities, and legacy orphan entities may have no
+parent edge.
 
 Code validates parent existence, database-root rules, duplicate siblings under
 the same parent, attempts to place one child under two submitted parents, and
@@ -110,7 +110,6 @@ SELECT * FROM edges WHERE parent_id = ? ORDER BY position;
 
 Recursive reads walk `edges` and hydrate each child from its subtype
 table. Replacement writes treat submitted `children` arrays as complete for
-each submitted entity: omitted children are detached from that entity, but their
-entity records remain stored. When an existing entity is submitted under a new
-parent, its old parent edge is removed and its submitted children replace its
-previous direct children.
+each submitted entity: omitted children are recursively deleted. When an
+existing entity is submitted under a new parent, its old parent edge is removed
+and its submitted children replace its previous direct children.

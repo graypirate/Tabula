@@ -39,7 +39,7 @@ describe("CLI JSON validation", () => {
         });
     });
 
-    test("validates standalone block replacement with children", () => {
+    test("validates recursive block replacement with children", () => {
         expect(parseWriteInput(JSON.stringify({
             type: "block",
             content: "New",

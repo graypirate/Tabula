@@ -32,7 +32,7 @@ Entity IDs determine type:
 ```bash
 agentdb init --workspace NAME
 agentdb create ENTITY_TYPE --workspace NAME [--name OBJECT_NAME | --content TEXT] [--parent ID] [--property key=value]
-agentdb write --workspace NAME < entity.json
+agentdb write --workspace NAME [--parent ID] < entity.json
 agentdb read --workspace NAME
 agentdb read ID --workspace NAME
 agentdb list
@@ -47,15 +47,16 @@ For existing workspaces, it opens the workspace and returns the same metadata.
 
 `create` creates one empty entity. `ENTITY_TYPE` must be `object` or `block`.
 Objects require `--name`; blocks require `--content`. Without `--parent`,
-objects are stored at the workspace root and blocks are standalone. With
-`--parent`, the new entity is appended under an existing object or block.
-Objects may also be parented by the workspace ID; blocks may not. Repeat
-`--property key=value` to add properties. Values are parsed as JSON when valid;
-otherwise they remain strings. Duplicate property keys are invalid.
+objects are stored at the workspace root. Blocks require `--parent` and are
+appended under an existing object or block. Objects may also be parented by the
+workspace ID; blocks may not. Repeat `--property key=value` to add properties.
+Values are parsed as JSON when valid; otherwise they remain strings. Duplicate
+property keys are invalid.
 
 `write` reads one recursive object or block JSON payload from stdin and creates
-or replaces that entity tree. Use it for nested writes, full replacements, or
-moving existing entities by ID.
+or replaces that entity tree. Object roots may omit `--parent` and become
+workspace-root objects. Block roots require `--parent ID`. Use `write` for
+nested writes, full replacements, or moving existing entities by ID.
 
 `read --workspace NAME` returns workspace metadata. `read ID --workspace NAME`
 returns stored data. For object and block IDs, it returns `{ "parentID": string
@@ -101,8 +102,8 @@ An ID should only be passed for existing entities you wish to overwrite complete
 
 Supplying an `id` replaces that entity. Submitted `children` arrays are the
 complete ordered child list for each submitted entity. Omitted children are
-detached from that parent, but not deleted. Supplying an existing child ID moves that
-entity into the submitted tree. Entities may only have one parent.
+recursively deleted. Supplying an existing child ID moves that entity into the
+submitted tree. Entities may only have one parent.
 
 ## Output
 

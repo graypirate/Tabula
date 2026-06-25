@@ -80,11 +80,13 @@ describe("CLI process output", () => {
             workspaceName,
             "--content",
             "Quick block",
+            "--parent",
+            emptyObject.id,
             "--property",
             "done=false",
         ]);
         const quickBlock = quickBlockResult.entity;
-        expect(quickBlockResult.parentID).toBeNull();
+        expect(quickBlockResult.parentID).toBe(emptyObject.id);
         expect(quickBlock.id).toStartWith("b_");
         expect(quickBlock.children).toEqual([]);
         expect(quickBlock.properties).toEqual({ done: false });
@@ -177,27 +179,39 @@ describe("CLI process output", () => {
         ])).toBe(true);
     });
 
-    test("creates and replaces a standalone block through write", async () => {
+    test("creates and replaces a parented block through write", async () => {
         const workspaceName = createWorkspaceName();
         await successfulJSON<WorkspaceMetadata>(["init", "--workspace", workspaceName]);
+        const parent = await successfulJSON<Result<Obj>>([
+            "create",
+            "object",
+            "--workspace",
+            workspaceName,
+            "--name",
+            "Parent",
+        ]);
 
         const createdResult = await successfulJSON<Result<Block>>([
             "write",
             "--workspace",
             workspaceName,
+            "--parent",
+            parent.entity.id,
         ], JSON.stringify({
             type: "block",
-            content: "Searchable standalone content",
+            content: "Searchable parented content",
             children: [],
         }));
         const created = createdResult.entity;
-        expect(createdResult.parentID).toBeNull();
+        expect(createdResult.parentID).toBe(parent.entity.id);
         expect(created.id).toStartWith("b_");
 
         const updated = await successfulJSON<Result<Block>>([
             "write",
             "--workspace",
             workspaceName,
+            "--parent",
+            parent.entity.id,
         ], JSON.stringify({
             id: created.id,
             type: "block",
@@ -206,7 +220,7 @@ describe("CLI process output", () => {
             children: [],
         }));
         expect(updated).toEqual({
-            parentID: null,
+            parentID: parent.entity.id,
             entity: {
                 id: created.id,
                 type: "block",
@@ -235,6 +249,21 @@ describe("CLI process output", () => {
             "--workspace",
             workspaceName,
         ])).toBe(true);
+
+        const missingParent = await spawnCLI([
+            "write",
+            "--workspace",
+            workspaceName,
+        ], JSON.stringify({
+            type: "block",
+            content: "Missing parent",
+            children: [],
+        }));
+        expect(missingParent.exitCode).toBe(2);
+        expect(missingParent.stdout).toBe("");
+        expect(JSON.parse(missingParent.stderr)).toMatchObject({
+            error: { code: "MISSING_OPTION" },
+        });
     });
 
     test("supports concurrent reads and closes every process connection", async () => {
@@ -303,6 +332,8 @@ describe("CLI process output", () => {
             "agent",
             "--content",
             "Invalid",
+            "--parent",
+            "o_parent",
             "--property",
             "missing-separator",
         ]);
@@ -310,6 +341,20 @@ describe("CLI process output", () => {
         expect(invalidProperty.stdout).toBe("");
         expect(JSON.parse(invalidProperty.stderr)).toMatchObject({
             error: { code: "INVALID_PROPERTY" },
+        });
+
+        const blockWithoutParent = await spawnCLI([
+            "create",
+            "block",
+            "--workspace",
+            "agent",
+            "--content",
+            "Invalid",
+        ]);
+        expect(blockWithoutParent.exitCode).toBe(2);
+        expect(blockWithoutParent.stdout).toBe("");
+        expect(JSON.parse(blockWithoutParent.stderr)).toMatchObject({
+            error: { code: "MISSING_OPTION" },
         });
     });
 
