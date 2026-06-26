@@ -22,7 +22,7 @@ export async function confirmationDialogue(
         return true;
     }
 
-    const response = await (options.readResponse ?? readInteractiveResponse)(`${prompt} (y/n) `);
+    const response = await (options.readResponse ?? readInteractiveResponse)(`${prompt} (y/n)`);
     const normalized = response?.trim().toLowerCase();
     return normalized === "y" || normalized === "yes";
 }

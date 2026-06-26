@@ -1,0 +1,24 @@
+{
+  "name": "agentdb-mcp",
+  "version": "0.0.5",
+  "description": "Local stdio MCP server for AgentDB workspaces",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "agentdb-mcp": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun src/index.ts",
+    "test": "bun test",
+    "typecheck": "bunx tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^25.9.1",
+    "typescript": "^5"
+  }
+}

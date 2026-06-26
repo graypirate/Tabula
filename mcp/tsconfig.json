@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun", "node"],
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "../core/storage/db/sql.d.ts"]
+}
