@@ -20,6 +20,10 @@
     "dist",
     "README.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/graypirate/Tabula"
+  },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && chmod 755 dist/index.js",
     "prepublishOnly": "bun run typecheck && bun test && bun run build",
