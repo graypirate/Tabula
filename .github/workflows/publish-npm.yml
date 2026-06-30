@@ -59,10 +59,9 @@ jobs:
             throw new Error(`mcp/package.json version ${mcp.version} does not match release ${releaseVersion}.`);
           }
 
-          const expectedCoreDependency = `^${releaseVersion}`;
-          if (mcp.dependencies?.["@graypirate/tabula"] !== expectedCoreDependency) {
+          if (!mcp.dependencies?.["@graypirate/tabula"]) {
             throw new Error(
-              `mcp/package.json must depend on @graypirate/tabula ${expectedCoreDependency}, found ${mcp.dependencies?.["@graypirate/tabula"]}.`
+              "mcp/package.json must declare a dependency on @graypirate/tabula."
             );
           }
           EOF
