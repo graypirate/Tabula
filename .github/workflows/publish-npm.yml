@@ -67,7 +67,7 @@ jobs:
           EOF
 
       - name: Run tests
-        run: bun test
+        run: bun run test
 
       - name: Run type checks
         run: bun run typecheck
