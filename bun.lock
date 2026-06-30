@@ -7,7 +7,7 @@
     },
     "core": {
       "name": "@graypirate/tabula",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "bin": {
         "tabula": "dist/CLI/index.js",
       },
@@ -22,7 +22,7 @@
     },
     "mcp": {
       "name": "@graypirate/tabula-mcp",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "bin": {
         "tabula-mcp": "dist/index.js",
       },
