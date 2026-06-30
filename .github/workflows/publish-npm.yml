@@ -1,0 +1,85 @@
+name: Publish npm packages
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org/
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate release versions
+        run: |
+          node <<'EOF'
+          const fs = require("node:fs");
+
+          const releaseTag = process.env.RELEASE_TAG;
+          const releaseVersion = releaseTag.replace(/^v/, "");
+          const core = JSON.parse(fs.readFileSync("core/package.json", "utf8"));
+          const mcp = JSON.parse(fs.readFileSync("mcp/package.json", "utf8"));
+
+          if (!releaseVersion || releaseVersion === releaseTag && !/^\d+\.\d+\.\d+/.test(releaseVersion)) {
+            throw new Error(`Release tag "${releaseTag}" must look like v1.2.3 or 1.2.3.`);
+          }
+
+          if (core.version !== releaseVersion) {
+            throw new Error(`core/package.json version ${core.version} does not match release ${releaseVersion}.`);
+          }
+
+          if (mcp.version !== releaseVersion) {
+            throw new Error(`mcp/package.json version ${mcp.version} does not match release ${releaseVersion}.`);
+          }
+
+          const expectedCoreDependency = `^${releaseVersion}`;
+          if (mcp.dependencies?.["@graypirate/tabula"] !== expectedCoreDependency) {
+            throw new Error(
+              `mcp/package.json must depend on @graypirate/tabula ${expectedCoreDependency}, found ${mcp.dependencies?.["@graypirate/tabula"]}.`
+            );
+          }
+          EOF
+
+      - name: Run tests
+        run: bun test
+
+      - name: Run type checks
+        run: bun run typecheck
+
+      - name: Build packages
+        run: bun run build
+
+      - name: Publish @graypirate/tabula
+        run: npm publish --provenance --access public
+        working-directory: core
+
+      - name: Publish @graypirate/tabula-mcp
+        run: npm publish --provenance --access public
+        working-directory: mcp
