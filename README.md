@@ -16,28 +16,31 @@ Tabula requires [Bun](https://bun.sh/) 1.3 or newer.
 bun --version
 ```
 
-## Installation from Source
+## Installation
 
-1. Download or clone the latest release of **Tabula**
-2. Open terminal to the downloaded `Tabula` folder
-3. Install dependencies and link both commands into `~/.bun/bin`:
+Install both the Core CLI and MCP server with Bun:
+
 ```bash
-bun run install:local
+bun add --global @graypirate/tabula @graypirate/tabula-mcp
 ```
-4. Verify both are available:
+
+Or install them with npm:
+
+```bash
+npm install --global @graypirate/tabula @graypirate/tabula-mcp
+```
+
+Both installation routes require Bun at runtime. Verify the commands:
+
 ```bash
 command -v tabula
 command -v tabula-mcp
 tabula list
 ```
 
-This links the commands to the current checkout; changes to the source are available immediately. Remove those links with `bun run uninstall:local`. If `command -v` cannot find them, add `~/.bun/bin` to your `PATH`.
-
 Installation does not create a workspace. Create the first workspace by [initializing](#initialization); Tabula then creates the managed storage directory at `~/.tabula` when needed.
 
-### Registry Installation
-
-After the packages are published, they can be installed independently from the npm registry:
+The packages can also be installed independently:
 
 - **[Core Package + CLI](./core/README.md#global-installation)**
 - **[MCP](./mcp/README.md#global-installation)**
@@ -50,7 +53,7 @@ See [CLI commands](./core/README.md#cli) for initialization.
 
 ## MCP Configuration
 
-Add the MCP to your LLM client after [installation](#installation-from-source).
+Add the MCP to your LLM client after [installation](#installation).
 
 ### Generic Client
 
@@ -103,6 +106,10 @@ Upgrade or remove the optional adapter independently:
 ```bash
 bun update --global @graypirate/tabula-mcp
 bun remove --global @graypirate/tabula-mcp
+
+# npm equivalents
+npm update --global @graypirate/tabula-mcp
+npm uninstall --global @graypirate/tabula-mcp
 ```
 
 ## CLI Commands

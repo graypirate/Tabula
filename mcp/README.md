@@ -4,11 +4,19 @@ Local stdio MCP server for Tabula. This package is a transport adapter and uses 
 
 ## Global Installation
 
-After the package is published, this installs the `tabula-mcp` executable and a compatible Tabula Core library from the npm registry. [Install Tabula Core globally](../core/README.md#global-installation) as well when you want its standalone CLI.
+Install the `tabula-mcp` executable and a compatible Tabula Core library with Bun:
 
 ```bash
 bun add --global @graypirate/tabula-mcp
 ```
+
+Or with npm:
+
+```bash
+npm install --global @graypirate/tabula-mcp
+```
+
+Bun is required at runtime regardless of which package manager installs it. [Install Tabula Core globally](../core/README.md#global-installation) separately if you also want the `tabula` CLI.
 
 Verify:
 ```bash
@@ -19,6 +27,10 @@ Upgrade or remove the MCP package with Bun:
 ```bash
 bun update --global @graypirate/tabula-mcp
 bun remove --global @graypirate/tabula-mcp
+
+# npm equivalents
+npm update --global @graypirate/tabula-mcp
+npm uninstall --global @graypirate/tabula-mcp
 ```
 
 Tabula MCP uses stdio. The MCP client starts and owns the server process; do not run it as a background daemon.

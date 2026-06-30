@@ -4,11 +4,19 @@ Core API and command-line interface for Tabula.
 
 ## Global Installation
 
-After the package is published, install the Core package and CLI from the npm registry:
+Install the Core package and `tabula` CLI with Bun:
 
 ```bash
 bun add --global @graypirate/tabula
 ```
+
+Or with npm:
+
+```bash
+npm install --global @graypirate/tabula
+```
+
+Bun is required at runtime regardless of which package manager installs it.
 
 Verify:
 ```bash
@@ -20,6 +28,18 @@ Upgrade or remove the Core package with Bun:
 ```bash
 bun update --global @graypirate/tabula
 bun remove --global @graypirate/tabula
+
+# npm equivalents
+npm update --global @graypirate/tabula
+npm uninstall --global @graypirate/tabula
+```
+
+To import the public API in another project, install it as a project dependency:
+
+```bash
+bun add @graypirate/tabula
+# or
+npm install @graypirate/tabula
 ```
 
 ## CLI
