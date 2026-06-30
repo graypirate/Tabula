@@ -1,14 +1,14 @@
 {
-  "name": "agentdb",
+  "name": "tabula",
   "version": "1.0.0",
-  "description": "Flexible object-oriented relational storage for LLM agents",
+  "description": "Flexible object-oriented relational storage for agents",
   "type": "module",
   "module": "./index.ts",
   "exports": {
     ".": "./index.ts"
   },
   "bin": {
-    "agentdb": "./CLI/index.ts"
+    "tabula": "./CLI/index.ts"
   },
   "files": [
     "API",

@@ -65,7 +65,7 @@ export function parseCommand(argv: string[]): CLICommand {
             if (parsed.positionals.length > 2) {
                 throw inputError(
                     "INVALID_ARGUMENTS",
-                    "Usage: agentdb list [ID] --workspace NAME",
+                    "Usage: tabula list [ID] --workspace NAME",
                 );
             }
             allowOptions(parsed, ["workspace"]);
@@ -81,7 +81,7 @@ export function parseCommand(argv: string[]): CLICommand {
 
         case "init": {
             const workspace = requireCommandWorkspace(parsed);
-            requirePositionals(parsed, 1, "agentdb init --workspace NAME");
+            requirePositionals(parsed, 1, "tabula init --workspace NAME");
             allowOptions(parsed, ["workspace"]);
             return {
                 action,
@@ -99,7 +99,7 @@ export function parseCommand(argv: string[]): CLICommand {
             requirePositionals(
                 parsed,
                 1,
-                "agentdb write --workspace NAME [--parent ID] < entity.json",
+                "tabula write --workspace NAME [--parent ID] < entity.json",
             );
             allowOptions(parsed, ["workspace", "parent"]);
             const parentID = optionalParentID(parsed);
@@ -113,7 +113,7 @@ export function parseCommand(argv: string[]): CLICommand {
             if (parsed.positionals.length > 2) {
                 throw inputError(
                     "INVALID_ARGUMENTS",
-                    "Usage: agentdb read [ID] --workspace NAME",
+                    "Usage: tabula read [ID] --workspace NAME",
                 );
             }
             allowOptions(parsed, ["workspace"]);
@@ -131,7 +131,7 @@ export function parseCommand(argv: string[]): CLICommand {
             if (parsed.positionals.length > 2) {
                 throw inputError(
                     "INVALID_ARGUMENTS",
-                    "Usage: agentdb delete [ID] --workspace NAME",
+                    "Usage: tabula delete [ID] --workspace NAME",
                 );
             }
             allowOptions(parsed, ["workspace"]);
@@ -142,7 +142,7 @@ export function parseCommand(argv: string[]): CLICommand {
             if (inferEntityType(id) === "workspace") {
                 throw inputError(
                     "UNSUPPORTED_DELETE",
-                    "Delete workspaces by name: agentdb delete --workspace NAME",
+                    "Delete workspaces by name: tabula delete --workspace NAME",
                 );
             }
             return { action, workspace, id };
@@ -153,7 +153,7 @@ export function parseCommand(argv: string[]): CLICommand {
             requirePositionals(
                 parsed,
                 2,
-                "agentdb search QUERY --workspace NAME [--type object|block]",
+                "tabula search QUERY --workspace NAME [--type object|block]",
             );
             allowOptions(parsed, ["workspace", "type"]);
             const type = optionalSingleOption(parsed, "type");
@@ -194,7 +194,7 @@ function parseCreate(parsed: ParsedArguments, workspace: string): CLICommand {
     requirePositionals(
         parsed,
         2,
-        "agentdb create object|block --workspace NAME [options]",
+        "tabula create object|block --workspace NAME [options]",
     );
 
     const entity = parsed.positionals[1];

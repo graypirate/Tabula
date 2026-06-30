@@ -4,20 +4,20 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import packageJSON from "../package.json" with { type: "json" };
 
-import { registerAgentDBTools } from "./tools/agentdb.ts";
+import { registerTabulaTools } from "./tools/tabula.ts";
 
-export function createAgentDBMCPServer(): McpServer {
+export function createTabulaMCPServer(): McpServer {
     const server = new McpServer({
-        name: "agentdb-mcp-server",
+        name: "tabula-mcp-server",
         version: packageJSON.version,
     });
 
-    registerAgentDBTools(server);
+    registerTabulaTools(server);
     return server;
 }
 
 async function main(): Promise<void> {
-    const server = createAgentDBMCPServer();
+    const server = createTabulaMCPServer();
     const transport = new StdioServerTransport();
     await server.connect(transport);
 }

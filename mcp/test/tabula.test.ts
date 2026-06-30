@@ -5,9 +5,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createAgentDBMCPServer } from "../src/index.ts";
-import { agentDBTools, MCPInputError } from "../src/tools/agentdb.ts";
-import { AgentDBInputError, type Result, type WorkspaceMetadata } from "agentdb";
+import { createTabulaMCPServer } from "../src/index.ts";
+import { MCPInputError, tabulaTools } from "../src/tools/tabula.ts";
+import { TabulaInputError, type Result, type WorkspaceMetadata } from "tabula";
 
 let tempDirectory: string | undefined;
 let originalHome: string | undefined;
@@ -25,35 +25,35 @@ afterEach(() => {
     originalHome = undefined;
 });
 
-describe("AgentDB MCP package", () => {
+describe("Tabula MCP package", () => {
     test("defines the expected tool surface with strict schemas", () => {
-        expect(agentDBTools.map((tool) => tool.name)).toEqual([
-            "agentdb_initialize_workspace",
-            "agentdb_list_workspaces",
-            "agentdb_read_workspace",
-            "agentdb_list_workspace_entities",
-            "agentdb_read_entity",
-            "agentdb_list_entity_children",
-            "agentdb_search_entities",
-            "agentdb_create_object",
-            "agentdb_create_block",
-            "agentdb_write_entity",
-            "agentdb_delete_entity",
-            "agentdb_delete_workspace",
+        expect(tabulaTools.map((tool) => tool.name)).toEqual([
+            "tabula_initialize_workspace",
+            "tabula_list_workspaces",
+            "tabula_read_workspace",
+            "tabula_list_workspace_entities",
+            "tabula_read_entity",
+            "tabula_list_entity_children",
+            "tabula_search_entities",
+            "tabula_create_object",
+            "tabula_create_block",
+            "tabula_write_entity",
+            "tabula_delete_entity",
+            "tabula_delete_workspace",
         ]);
 
-        for (const tool of agentDBTools) {
+        for (const tool of tabulaTools) {
             expect(() => tool.inputSchema.parse({ argv: ["--workspace", "x"] })).toThrow();
             expect(() => tool.inputSchema.parse({ stdin: "{}" })).toThrow();
             expect(() => tool.inputSchema.parse({ file: "entity.json" })).toThrow();
         }
     });
 
-    test("executes workspace and entity workflows through AgentDB public API", () => {
+    test("executes workspace and entity workflows through Tabula public API", () => {
         useTempHome();
 
         const initialized = structured<WorkspaceMetadata>(execute(
-            "agentdb_initialize_workspace",
+            "tabula_initialize_workspace",
             { workspace: "mcp_workspace" },
         ));
         expect(initialized).toMatchObject({
@@ -61,21 +61,21 @@ describe("AgentDB MCP package", () => {
             name: "mcp_workspace",
         });
 
-        expect(structured<{ workspaces: string[] }>(execute("agentdb_list_workspaces", {}))).toEqual({
+        expect(structured<{ workspaces: string[] }>(execute("tabula_list_workspaces", {}))).toEqual({
             workspaces: ["mcp_workspace"],
         });
         expect(structured<WorkspaceMetadata>(execute(
-            "agentdb_read_workspace",
+            "tabula_read_workspace",
             { workspace: "mcp_workspace" },
         ))).toEqual(initialized);
 
-        const object = structured<Result>(execute("agentdb_create_object", {
+        const object = structured<Result>(execute("tabula_create_object", {
             workspace: "mcp_workspace",
             name: "Project",
             properties: { columns: ["status"] },
         }));
         const objectID = object.entity.id;
-        const block = structured<Result>(execute("agentdb_create_block", {
+        const block = structured<Result>(execute("tabula_create_block", {
             workspace: "mcp_workspace",
             parentID: objectID,
             content: "First row",
@@ -83,21 +83,21 @@ describe("AgentDB MCP package", () => {
         }));
         const blockID = block.entity.id;
 
-        expect(structured<{ objectIDs: string[] }>(execute("agentdb_list_workspace_entities", {
+        expect(structured<{ objectIDs: string[] }>(execute("tabula_list_workspace_entities", {
             workspace: "mcp_workspace",
         }))).toEqual({ objectIDs: [objectID] });
-        expect(structured<{ childIDs: string[] }>(execute("agentdb_list_entity_children", {
+        expect(structured<{ childIDs: string[] }>(execute("tabula_list_entity_children", {
             workspace: "mcp_workspace",
             id: objectID,
         }))).toEqual({ childIDs: [blockID] });
         expect(structured<{ results: { type: string; id: string; label: string }[] }>(execute(
-            "agentdb_search_entities",
+            "tabula_search_entities",
             { workspace: "mcp_workspace", query: "active", type: "block" },
         ))).toEqual({
             results: [{ type: "block", id: blockID, label: "First row" }],
         });
 
-        const written = structured<Result>(execute("agentdb_write_entity", {
+        const written = structured<Result>(execute("tabula_write_entity", {
             workspace: "mcp_workspace",
             entity: {
                 type: "object",
@@ -113,26 +113,26 @@ describe("AgentDB MCP package", () => {
         }));
         const writtenID = written.entity.id;
 
-        expect(structured<Result>(execute("agentdb_read_entity", {
+        expect(structured<Result>(execute("tabula_read_entity", {
             workspace: "mcp_workspace",
             id: writtenID,
         }))).toEqual(written);
-        expect(structured<{ deleted: boolean }>(execute("agentdb_delete_entity", {
+        expect(structured<{ deleted: boolean }>(execute("tabula_delete_entity", {
             workspace: "mcp_workspace",
             id: blockID,
         }))).toEqual({ deleted: true });
-        expect(structured<{ deleted: boolean }>(execute("agentdb_delete_workspace", {
+        expect(structured<{ deleted: boolean }>(execute("tabula_delete_workspace", {
             workspace: "mcp_workspace",
         }))).toEqual({ deleted: true });
     });
 
     test("rejects ambiguous inputs, invalid workspace names, and invalid write shapes", () => {
-        expect(() => execute("agentdb_create_object", {
+        expect(() => execute("tabula_create_object", {
             workspace: "mcp",
             name: "Invalid",
             argv: ["--property", "status=active"],
         })).toThrow();
-        expect(() => execute("agentdb_write_entity", {
+        expect(() => execute("tabula_write_entity", {
             workspace: "mcp",
             stdin: "{}",
             entity: {
@@ -142,15 +142,15 @@ describe("AgentDB MCP package", () => {
                 children: [],
             },
         })).toThrow();
-        expect(() => execute("agentdb_initialize_workspace", {
+        expect(() => execute("tabula_initialize_workspace", {
             workspace: "../notes",
         })).toThrow(MCPInputError);
-        expect(() => execute("agentdb_create_block", {
+        expect(() => execute("tabula_create_block", {
             workspace: "mcp",
             parentID: "d_workspace",
             content: "Invalid",
         })).toThrow(MCPInputError);
-        expect(() => execute("agentdb_write_entity", {
+        expect(() => execute("tabula_write_entity", {
             workspace: "mcp",
             entity: {
                 type: "object",
@@ -159,14 +159,14 @@ describe("AgentDB MCP package", () => {
                 properties: {},
                 children: [],
             },
-        })).toThrow(AgentDBInputError);
+        })).toThrow(TabulaInputError);
     });
 
     test("lists and calls tools through the SDK server transport", async () => {
         useTempHome();
 
-        const server = createAgentDBMCPServer();
-        const client = new Client({ name: "agentdb-mcp-test", version: "0.0.0" });
+        const server = createTabulaMCPServer();
+        const client = new Client({ name: "tabula-mcp-test", version: "0.0.0" });
         const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
         await Promise.all([
             server.connect(serverTransport),
@@ -175,8 +175,8 @@ describe("AgentDB MCP package", () => {
 
         try {
             const listed = await client.listTools();
-            expect(listed.tools.map((tool) => tool.name)).toEqual(agentDBTools.map((tool) => tool.name));
-            expect(listed.tools.find((tool) => tool.name === "agentdb_create_object")?.inputSchema)
+            expect(listed.tools.map((tool) => tool.name)).toEqual(tabulaTools.map((tool) => tool.name));
+            expect(listed.tools.find((tool) => tool.name === "tabula_create_object")?.inputSchema)
                 .toMatchObject({
                     type: "object",
                     properties: {
@@ -187,7 +187,7 @@ describe("AgentDB MCP package", () => {
                 });
 
             const result = await client.callTool({
-                name: "agentdb_initialize_workspace",
+                name: "tabula_initialize_workspace",
                 arguments: { workspace: "sdk" },
             });
             expect(result.structuredContent).toMatchObject({
@@ -198,7 +198,7 @@ describe("AgentDB MCP package", () => {
             expect(JSON.parse(content[0]?.text ?? "{}")).toEqual(result.structuredContent);
 
             const invalidWrite = await client.callTool({
-                name: "agentdb_write_entity",
+                name: "tabula_write_entity",
                 arguments: {
                     workspace: "sdk",
                     entity: {
@@ -223,13 +223,13 @@ describe("AgentDB MCP package", () => {
 });
 
 function useTempHome(): void {
-    tempDirectory = mkdtempSync(join(tmpdir(), "agentdb-mcp-"));
+    tempDirectory = mkdtempSync(join(tmpdir(), "tabula-mcp-"));
     originalHome = process.env.HOME;
     process.env.HOME = tempDirectory;
 }
 
-function execute(name: string, input: unknown): ReturnType<typeof agentDBTools[number]["execute"]> {
-    const tool = agentDBTools.find((candidate) => candidate.name === name);
+function execute(name: string, input: unknown): ReturnType<typeof tabulaTools[number]["execute"]> {
+    const tool = tabulaTools.find((candidate) => candidate.name === name);
     if (tool === undefined) {
         throw new Error(`Missing tool: ${name}`);
     }

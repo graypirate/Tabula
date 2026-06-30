@@ -1,33 +1,33 @@
-# AgentDB Core
+# Tabula Core
 
-Core API and command-line interface for AgentDB.
+Core API and command-line interface for Tabula.
 
 ## Global Installation
 
-Install the Core package and CLI individually:
+After the package is published, install the Core package and CLI from the npm registry:
 
 ```bash
-bun add --global agentdb
+bun add --global tabula
 ```
 
 Verify:
 ```bash
-command -v agentdb
-agentdb list
+command -v tabula
+tabula list
 ```
 
 Upgrade or remove the Core package with Bun:
 ```bash
-bun update --global agentdb
-bun remove --global agentdb
+bun update --global tabula
+bun remove --global tabula
 ```
 
 ## CLI
 
 Most commands follow one of these forms:
 ```bash
-agentdb <command> [arguments] [options]
-agentdb <command> <subcommand> [arguments] [options]
+tabula <command> [arguments] [options]
+tabula <command> <subcommand> [arguments] [options]
 ```
 
 Current command groups:
@@ -55,14 +55,14 @@ Commands that operate inside a workspace require `--workspace NAME`.
 ### Workspaces
 
 ```bash
-agentdb init --workspace example
-agentdb list
-agentdb read --workspace example
-agentdb list --workspace example
-agentdb delete --workspace example
+tabula init --workspace example
+tabula list
+tabula read --workspace example
+tabula list --workspace example
+tabula delete --workspace example
 ```
 
-`init` creates or opens `~/.agentdb/<name>.sqlite` and returns workspace
+`init` creates or opens `~/.tabula/<name>.sqlite` and returns workspace
 metadata. Bare `list` returns managed workspace names. `read --workspace`
 returns metadata, while `list --workspace` returns ordered root Object IDs.
 
@@ -72,12 +72,12 @@ terminals ask for confirmation; non-interactive commands do not prompt.
 ### Create Objects and Blocks
 
 ```bash
-agentdb create object \
+tabula create object \
   --workspace example \
   --name "Project" \
   --property status=active
 
-agentdb create block \
+tabula create block \
   --workspace example \
   --parent o_parent \
   --content "First task" \
@@ -93,7 +93,7 @@ values are parsed as JSON when valid and otherwise remain strings.
 `write` accepts exactly one recursive Object or Block JSON value from stdin:
 
 ```bash
-agentdb write --workspace example <<'JSON'
+tabula write --workspace example <<'JSON'
 {
   "type": "object",
   "name": "Document",
@@ -118,11 +118,11 @@ written at workspace root; Block roots require `--parent ID`.
 ### Read, List, Search, and Delete
 
 ```bash
-agentdb read o_example --workspace example
-agentdb list o_example --workspace example
-agentdb search "draft" --workspace example
-agentdb search "draft" --workspace example --type block
-agentdb delete b_example --workspace example
+tabula read o_example --workspace example
+tabula list o_example --workspace example
+tabula search "draft" --workspace example
+tabula search "draft" --workspace example --type block
+tabula delete b_example --workspace example
 ```
 
 `read ID` returns the parent ID and complete recursive entity tree. `list ID`

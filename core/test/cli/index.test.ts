@@ -32,7 +32,7 @@ describe("CLI confirmation orchestration", () => {
         ]);
         expect(initialized.name).toBe("agent");
 
-        const databasePath = join(tempDirectory!, ".agentdb", "agent.sqlite");
+        const databasePath = join(tempDirectory!, ".tabula", "agent.sqlite");
         expect(existsSync(databasePath)).toBe(true);
 
         const deleted = await runCLI([
@@ -85,7 +85,7 @@ describe("CLI confirmation orchestration", () => {
     test("rejected confirmation returns false and skips dispatch", async () => {
         useTempHome();
         await successfulOutput<WorkspaceMetadata>(["init", "--workspace", "agent"]);
-        const databasePath = join(tempDirectory!, ".agentdb", "agent.sqlite");
+        const databasePath = join(tempDirectory!, ".tabula", "agent.sqlite");
 
         const result = await runCLI([
             "delete",
@@ -112,7 +112,7 @@ async function successfulOutput<T>(arguments_: string[]): Promise<T> {
 }
 
 function useTempHome(): void {
-    tempDirectory = mkdtempSync(join(tmpdir(), "agentdb-cli-index-"));
+    tempDirectory = mkdtempSync(join(tmpdir(), "tabula-cli-index-"));
     originalHome = process.env.HOME;
     process.env.HOME = tempDirectory;
 }

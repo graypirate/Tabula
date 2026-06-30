@@ -1,14 +1,14 @@
 {
-  "name": "agentdb-mcp",
+  "name": "tabula-mcp",
   "version": "1.0.0",
-  "description": "Local stdio MCP server for AgentDB.",
+  "description": "Local stdio MCP server for Tabula.",
   "type": "module",
   "module": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
   },
   "bin": {
-    "agentdb-mcp": "./src/index.ts"
+    "tabula-mcp": "./src/index.ts"
   },
   "files": [
     "src",
@@ -20,7 +20,7 @@
     "typecheck": "bunx tsc --noEmit"
   },
   "dependencies": {
-    "agentdb": "workspace:^",
+    "tabula": "^1.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^3.25.76"
   },

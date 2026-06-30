@@ -33,10 +33,10 @@ afterEach(() => {
 test("resolves managed workspace names to SQLite database paths", () => {
     useTempHome();
 
-    expect(workspaceDirectory()).toBe(join(tempDirectory!, ".agentdb"));
-    expect(resolveWorkspaceDatabasePath("agent")).toBe(join(tempDirectory!, ".agentdb", "agent.sqlite"));
-    expect(resolveWorkspaceDatabasePath("agent.db-1")).toBe(join(tempDirectory!, ".agentdb", "agent.db-1.sqlite"));
-    expect(existsSync(join(tempDirectory!, ".agentdb"))).toBe(false);
+    expect(workspaceDirectory()).toBe(join(tempDirectory!, ".tabula"));
+    expect(resolveWorkspaceDatabasePath("agent")).toBe(join(tempDirectory!, ".tabula", "agent.sqlite"));
+    expect(resolveWorkspaceDatabasePath("agent.db-1")).toBe(join(tempDirectory!, ".tabula", "agent.db-1.sqlite"));
+    expect(existsSync(join(tempDirectory!, ".tabula"))).toBe(false);
 });
 
 test("rejects invalid workspace names", () => {
@@ -48,7 +48,7 @@ test("rejects invalid workspace names", () => {
 
 test("initializes package storage idempotently", () => {
     useTempHome();
-    const directory = join(tempDirectory!, ".agentdb");
+    const directory = join(tempDirectory!, ".tabula");
 
     expect(initializePackageStorage()).toBe(directory);
     expect(existsSync(directory)).toBe(true);
@@ -96,7 +96,7 @@ test("deletes managed workspace files without globbing neighboring paths", () =>
 });
 
 function useTempHome(): void {
-    tempDirectory = mkdtempSync(join(tmpdir(), "agentdb-resolution-"));
+    tempDirectory = mkdtempSync(join(tmpdir(), "tabula-resolution-"));
     originalHome = process.env.HOME;
     process.env.HOME = tempDirectory;
 }

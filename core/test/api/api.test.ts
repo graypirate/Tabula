@@ -49,13 +49,13 @@ afterEach(() => {
 });
 
 test("initializes and opens an existing managed workspace by name", () => {
-    tempDirectory = mkdtempSync(join(tmpdir(), "agentdb-api-"));
+    tempDirectory = mkdtempSync(join(tmpdir(), "tabula-api-"));
     originalHome = process.env.HOME;
     process.env.HOME = tempDirectory;
     const workspaceName = "workspace";
     const missingWorkspaceName = "missing";
-    const databasePath = join(tempDirectory, ".agentdb", `${workspaceName}.sqlite`);
-    const missingPath = join(tempDirectory, ".agentdb", `${missingWorkspaceName}.sqlite`);
+    const databasePath = join(tempDirectory, ".tabula", `${workspaceName}.sqlite`);
+    const missingPath = join(tempDirectory, ".tabula", `${missingWorkspaceName}.sqlite`);
 
     expect(() => openWorkspace(missingWorkspaceName)).toThrow();
     expect(existsSync(missingPath)).toBe(false);
@@ -72,7 +72,7 @@ test("initializes and opens an existing managed workspace by name", () => {
 
 test("quick create functions return recursive public entities", () => {
     db = initializeStorage(":memory:");
-    const objectResult = createObject(db, "AgentDB", { active: true });
+    const objectResult = createObject(db, "Tabula", { active: true });
     const blockResult = createBlock(
         db,
         "Child",
@@ -87,7 +87,7 @@ test("quick create functions return recursive public entities", () => {
     expect(object).toEqual({
         id: expect.stringMatching(/^o_/),
         type: "object",
-        name: "AgentDB",
+        name: "Tabula",
         properties: { active: true },
         children: [],
     });

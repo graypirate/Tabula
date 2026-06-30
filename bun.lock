@@ -3,13 +3,13 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "agentdb-workspace",
+      "name": "tabula-workspace",
     },
     "core": {
-      "name": "agentdb",
+      "name": "tabula",
       "version": "1.0.0",
       "bin": {
-        "agentdb": "./CLI/index.ts",
+        "tabula": "./CLI/index.ts",
       },
       "dependencies": {
         "yaml": "^2.9.0",
@@ -21,14 +21,14 @@
       },
     },
     "mcp": {
-      "name": "agentdb-mcp",
+      "name": "tabula-mcp",
       "version": "1.0.0",
       "bin": {
-        "agentdb-mcp": "./src/index.ts",
+        "tabula-mcp": "./src/index.ts",
       },
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.29.0",
-        "agentdb": "workspace:^",
+        "tabula": "workspace:^",
         "zod": "^3.25.76",
       },
       "devDependencies": {
@@ -49,9 +49,9 @@
 
     "accepts": ["accepts@2.0.0", "", { "dependencies": { "mime-types": "^3.0.0", "negotiator": "^1.0.0" } }, "sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng=="],
 
-    "agentdb": ["agentdb@workspace:core"],
+    "tabula": ["tabula@workspace:core"],
 
-    "agentdb-mcp": ["agentdb-mcp@workspace:mcp"],
+    "tabula-mcp": ["tabula-mcp@workspace:mcp"],
 
     "ajv": ["ajv@8.20.0", "", { "dependencies": { "fast-deep-equal": "^3.1.3", "fast-uri": "^3.0.1", "json-schema-traverse": "^1.0.0", "require-from-string": "^2.0.2" } }, "sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA=="],
 

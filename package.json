@@ -1,11 +1,13 @@
 {
-  "name": "agentdb-workspace",
+  "name": "tabula-workspace",
   "private": true,
   "workspaces": [
     "core",
     "mcp"
   ],
   "scripts": {
+    "install:local": "bun scripts/local-install.ts install",
+    "uninstall:local": "bun scripts/local-install.ts uninstall",
     "test": "bun run --workspaces test",
     "typecheck": "bun run --workspaces typecheck"
   }

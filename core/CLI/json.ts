@@ -3,7 +3,7 @@ import type {
     JSONRecord,
     ObjectWrite,
 } from "../index.ts";
-import { AgentDBInputError, validateWriteInput } from "../index.ts";
+import { TabulaInputError, validateWriteInput } from "../index.ts";
 import { CLIInputError } from "./errors.ts";
 
 export type WriteInput =
@@ -18,7 +18,7 @@ export function parseWriteInput(input: string): WriteInput {
     try {
         entity = validateWriteInput(value);
     } catch (error) {
-        if (error instanceof AgentDBInputError) {
+        if (error instanceof TabulaInputError) {
             throw inputError(error.code, error.message, error.details);
         }
         throw error;

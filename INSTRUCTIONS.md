@@ -1,28 +1,28 @@
-# AgentDB Client Instructions
+# Tabula Client Instructions
 
-This is AgentDB, a flexible workspace for storing context as object-oriented components.
+This is Tabula, a flexible workspace for storing context as object-oriented components.
 
 The repository is a Bun workspace with the Core package under `core/` and
-the optional MCP adapter under `mcp/`. Installed commands are `agentdb` and
-`agentdb-mcp`.
+the optional MCP adapter under `mcp/`. Installed commands are `tabula` and
+`tabula-mcp`.
 
 ## Overview
-AgentDB operates on workspaces.
+Tabula operates on workspaces.
 Workspaces are structured containers of flexible entities called Objects and Blocks. Objects and Blocks may parent one another recursively.
 
 
 Commands that operate inside one workspace require `--workspace NAME`.
-The package initializes managed storage at `~/.agentdb`, and workspaces resolve
-to `~/.agentdb/<name>.sqlite`. Clients pass names, not SQLite paths.
+The package initializes managed storage at `~/.tabula`, and workspaces resolve
+to `~/.tabula/<name>.sqlite`. Clients pass names, not SQLite paths.
 
 You should NEVER query workspace SQLite files directly. Use only the public API,
 CLI, or MCP tools. Direct file manipulation can break a workspace.
 
 ## MCP
 
-Install `agentdb-mcp` separately from `agentdb`. MCP clients launch the
-`agentdb-mcp` command over stdio with no arguments. The adapter must import
-AgentDB only through the public `agentdb` package API.
+Install `tabula-mcp` separately from `tabula`. MCP clients launch the
+`tabula-mcp` command over stdio with no arguments. The adapter must import
+Tabula only through the public `tabula` package API.
 
 ## Workspaces
 Workspace names may contain letters, numbers, underscores, hyphens, and dots.
@@ -39,17 +39,17 @@ Entity IDs determine type:
 ## Commands
 
 ```bash
-agentdb init --workspace NAME
-agentdb create ENTITY_TYPE --workspace NAME [--name OBJECT_NAME | --content TEXT] [--parent ID] [--property key=value]
-agentdb write --workspace NAME [--parent ID] < entity.json
-agentdb read --workspace NAME
-agentdb read ID --workspace NAME
-agentdb list
-agentdb list --workspace NAME
-agentdb list ID --workspace NAME
-agentdb search QUERY --workspace NAME [--type object|block]
-agentdb delete --workspace NAME
-agentdb delete ID --workspace NAME
+tabula init --workspace NAME
+tabula create ENTITY_TYPE --workspace NAME [--name OBJECT_NAME | --content TEXT] [--parent ID] [--property key=value]
+tabula write --workspace NAME [--parent ID] < entity.json
+tabula read --workspace NAME
+tabula read ID --workspace NAME
+tabula list
+tabula list --workspace NAME
+tabula list ID --workspace NAME
+tabula search QUERY --workspace NAME [--type object|block]
+tabula delete --workspace NAME
+tabula delete ID --workspace NAME
 ```
 
 `init` creates a managed workspace if needed and returns workspace metadata.

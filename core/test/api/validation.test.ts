@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-    AgentDBInputError,
+    TabulaInputError,
     validateWriteInput,
 } from "../../API";
 
@@ -118,9 +118,9 @@ describe("API write input validation", () => {
 function expectValidationError(input: unknown, code: string): void {
     try {
         validateWriteInput(input);
-        throw new Error("Expected AgentDBInputError");
+        throw new Error("Expected TabulaInputError");
     } catch (error) {
-        expect(error).toBeInstanceOf(AgentDBInputError);
-        expect((error as AgentDBInputError).code).toBe(code);
+        expect(error).toBeInstanceOf(TabulaInputError);
+        expect((error as TabulaInputError).code).toBe(code);
     }
 }

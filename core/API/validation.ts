@@ -10,8 +10,8 @@ type JSONObject = JSONRecord;
 const blockFields = new Set(["id", "type", "content", "properties", "children"]);
 const objectFields = new Set(["id", "type", "name", "properties", "children"]);
 
-export class AgentDBInputError extends Error {
-    override readonly name = "AgentDBInputError";
+export class TabulaInputError extends Error {
+    override readonly name = "TabulaInputError";
 
     constructor(readonly code: string, message: string, readonly details?: unknown) {
         super(message);
@@ -150,6 +150,6 @@ function optionalProperties(
     return { properties: requireObject(value.properties, path) };
 }
 
-function inputError(code: string, message: string, details?: unknown): AgentDBInputError {
-    return new AgentDBInputError(code, message, details);
+function inputError(code: string, message: string, details?: unknown): TabulaInputError {
+    return new TabulaInputError(code, message, details);
 }

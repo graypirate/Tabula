@@ -105,7 +105,7 @@ test("openDatabase validates existing metadata without running schema setup", ()
 });
 
 function createTempDatabasePath(): string {
-    tempDirectory = mkdtempSync(join(tmpdir(), "agentdb-init-"));
+    tempDirectory = mkdtempSync(join(tmpdir(), "tabula-init-"));
     return join(tempDirectory, "database.sqlite");
 }
 

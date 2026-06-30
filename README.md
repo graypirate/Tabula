@@ -1,53 +1,56 @@
 <p align="center" width="100%">
-<img width="120" alt="AgentDB logo" src="./icon.png">
+<img width="120" alt="Tabula logo" src="./icon.png">
 </p>
 
-<h1 align="center">AgentDB</h1>
+<h1 align="center">Tabula</h1>
 
 <p align="center">Highly flexible object-oriented relational storage, built for LLM agents.</p>
 
-**AgentDB** organizes structured data and content in ordered trees that agents can access through a local command-line interface, or additional MCP package (preferred). Each workspace contains Objects and Blocks. Objects are named containers that define structure; Blocks hold content or records. Both can carry custom properties and contain other Objects or Blocks, allowing the same model to represent documents, datasets, tables, tasks, and other structured information.
+**Tabula** organizes structured data and content in ordered trees that agents can access through a local command-line interface, or additional MCP package (preferred). Each workspace contains Objects and Blocks. Objects are named containers that define structure; Blocks hold content or records. Both can carry custom properties and contain other Objects or Blocks, allowing the same model to represent documents, datasets, tables, tasks, and other structured information.
 
 ## Requirements
 
-AgentDB requires [Bun](https://bun.sh/) 1.3 or newer.
+Tabula requires [Bun](https://bun.sh/) 1.3 or newer.
 
 ```bash
 bun --version
 ```
 
-## Installation
+## Installation from Source
 
-*You must install either command globally for normal use outside the source repository.*
-
-1. Download or clone the latest release of **AgentDB**
-2. Open terminal to the downloaded `AgentDB` folder
-3. Install both Core and MCP packages globally:
+1. Download or clone the latest release of **Tabula**
+2. Open terminal to the downloaded `Tabula` folder
+3. Install dependencies and link both commands into `~/.bun/bin`:
 ```bash
-bun add --global ./core ./mcp
+bun run install:local
 ```
 4. Verify both are available:
 ```bash
-agentdb --help
-agentdb-mcp --help
+command -v tabula
+command -v tabula-mcp
+tabula list
 ```
 
-Installation does not create a workspace or mutate your home directory. Create the first workspace by [initializing](#initialization); AgentDB then creates the managed storage directory at `~/.agentdb` when needed:
+This links the commands to the current checkout; changes to the source are available immediately. Remove those links with `bun run uninstall:local`. If `command -v` cannot find them, add `~/.bun/bin` to your `PATH`.
 
-### Individual Installation
+Installation does not create a workspace. Create the first workspace by [initializing](#initialization); Tabula then creates the managed storage directory at `~/.tabula` when needed.
+
+### Registry Installation
+
+After the packages are published, they can be installed independently from the npm registry:
 
 - **[Core Package + CLI](./core/README.md#global-installation)**
 - **[MCP](./mcp/README.md#global-installation)**
 
 ## Initialization
-Unless you are querying workspaces directly, the user **does not** have to initialize before using with an LLM client. On creation/initialization of the first workspace, the managed workspace storage directory is created at `~/.agentdb`.
+Unless you are querying workspaces directly, the user **does not** have to initialize before using with an LLM client. On creation/initialization of the first workspace, the managed workspace storage directory is created at `~/.tabula`.
 
 See [CLI commands](./core/README.md#cli) for initialization.
 
 
 ## MCP Configuration
 
-Add the MCP to your LLM client after [installation](#installation).
+Add the MCP to your LLM client after [installation](#installation-from-source).
 
 ### Generic Client
 
@@ -56,8 +59,8 @@ Every stdio MCP client needs the same command and no arguments:
 ```json
 {
   "mcpServers": {
-    "agentdb": {
-      "command": "agentdb-mcp",
+    "tabula": {
+      "command": "tabula-mcp",
       "args": []
     }
   }
@@ -66,20 +69,20 @@ Every stdio MCP client needs the same command and no arguments:
 
 Some clients use `mcp_servers` instead of `mcpServers`, but the launch contract
 is unchanged. If a desktop client does not inherit your shell `PATH`, run
-`command -v agentdb-mcp` and use the returned absolute path as `command`.
+`command -v tabula-mcp` and use the returned absolute path as `command`.
 
 ### Codex
 
 ```bash
-codex mcp add agentdb -- agentdb-mcp
+codex mcp add tabula -- tabula-mcp
 codex mcp list
 ```
 
 ### OpenClaw
 
 ```bash
-openclaw mcp add agentdb --command agentdb-mcp
-openclaw mcp doctor agentdb --probe
+openclaw mcp add tabula --command tabula-mcp
+openclaw mcp doctor tabula --probe
 ```
 
 ### Hermes
@@ -88,8 +91,8 @@ Add the server to `~/.hermes/config.yaml`:
 
 ```yaml
 mcp_servers:
-  agentdb:
-    command: agentdb-mcp
+  tabula:
+    command: tabula-mcp
     args: []
 ```
 
@@ -98,40 +101,64 @@ Restart Hermes so it discovers the server and registers its tools.
 Upgrade or remove the optional adapter independently:
 
 ```bash
-bun update --global agentdb-mcp
-bun remove --global agentdb-mcp
+bun update --global tabula-mcp
+bun remove --global tabula-mcp
 ```
 
 ## CLI Commands
 
-The `agentdb` CLI ships with the Core package. See commands, behavior, examples, and workspace rules in the [Core documentation](./core/README.md#cli).
+The `tabula` CLI ships with the Core package. See commands, behavior, examples, and workspace rules in the [Core documentation](./core/README.md#cli).
   
 ## Storage and API Boundary
 
-While workspaces are stored in SQLite, clients **always** pass workspace names, **never** SQLite paths. Managed workspaces live at `~/.agentdb/<name>.sqlite`. **Do not** query or modify those files directly.
+While workspaces are stored in SQLite, clients **always** pass workspace names, **never** SQLite paths. Managed workspaces live at `~/.tabula/<name>.sqlite`. **Do not** query or modify those files directly.
 
-The public TypeScript API is exported by `agentdb`. MCP depends only on that public package contract. SQLite storage types and containment tables remain internal implementation details.
+The public TypeScript API is exported by `tabula`. MCP depends only on that public package contract. SQLite storage types and containment tables remain internal implementation details.
 
 ## Development Installation
 
 This repository is a Bun workspace containing two packages:
 
-- `core/` publishes `agentdb` and provides the `agentdb` CLI.
-- `mcp/` publishes `agentdb-mcp` and depends on the local Core workspace.
+- `core/` publishes `tabula` and provides the `tabula` CLI.
+- `mcp/` publishes `tabula-mcp` and depends on the local Core workspace.
+
+From the repository root, install the workspace dependencies and link both
+commands into `~/.bun/bin`:
+```bash
+bun run install:local
+```
+
+The links point at the current checkout, so source changes are available without
+reinstalling. Verify the developer installation and run the project checks:
+```bash
+command -v tabula
+command -v tabula-mcp
+tabula list
+
+bun test
+bun run typecheck
+```
+
+Remove only the links owned by this checkout with:
+```bash
+bun run uninstall:local
+```
+
+If either command is not found, add `~/.bun/bin` to your `PATH`.
 
 ### Isolated Package Development
 
 Use workspace filters when you only want Bun to install or run one package:
 
 ```bash
-bun install --filter agentdb
-bun install --filter agentdb-mcp
+bun install --filter tabula
+bun install --filter tabula-mcp
 
-bun --filter agentdb test
-bun --filter agentdb-mcp test
+bun --filter tabula test
+bun --filter tabula-mcp test
 ```
 
-Targeting `agentdb-mcp` also includes its local `agentdb` dependency. This is package-isolated installation within the workspace, not a separate dependency universe: both packages still use the repository's root lockfile and workspace links.
+Targeting `tabula-mcp` also includes its local `tabula` dependency. This is package-isolated installation within the workspace, not a separate dependency universe: both packages still use the repository's root lockfile and workspace links.
 
 Running plain `bun install` from `core/` or `mcp/` is not an isolated install. Bun discovers the parent workspace and installs the entire workspace, just as if the command had been run from the repository root. Use `--filter` when you intend to target one development package.
 

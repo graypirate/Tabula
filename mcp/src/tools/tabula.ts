@@ -18,12 +18,12 @@ import {
     validateWriteInput,
     validateWorkspaceName,
     writeEntity,
-    AgentDBInputError,
+    TabulaInputError,
     type Create,
     type JSONRecord,
     type SearchType,
     type Write,
-} from "agentdb";
+} from "tabula";
 
 export class MCPInputError extends Error {
     override readonly name = "MCPInputError";
@@ -46,7 +46,7 @@ type ToolResult = {
     isError?: true;
 };
 
-type AgentDBTool = {
+type TabulaTool = {
     name: string;
     title: string;
     description: string;
@@ -94,11 +94,11 @@ const writeEntitySchema = z.object({
     entity: z.unknown(),
 }).strict();
 
-export const agentDBTools: AgentDBTool[] = [
+export const tabulaTools: TabulaTool[] = [
     {
-        name: "agentdb_initialize_workspace",
-        title: "Initialize AgentDB Workspace",
-        description: "Create or open a managed AgentDB workspace by workspace name.",
+        name: "tabula_initialize_workspace",
+        title: "Initialize Tabula Workspace",
+        description: "Create or open a managed Tabula workspace by workspace name.",
         inputSchema: workspaceSchema,
         annotations: mutation({ idempotentHint: true }),
         execute(input) {
@@ -107,9 +107,9 @@ export const agentDBTools: AgentDBTool[] = [
         },
     },
     {
-        name: "agentdb_list_workspaces",
-        title: "List AgentDB Workspaces",
-        description: "List managed AgentDB workspace names.",
+        name: "tabula_list_workspaces",
+        title: "List Tabula Workspaces",
+        description: "List managed Tabula workspace names.",
         inputSchema: emptySchema,
         annotations: readOnly(),
         execute(input) {
@@ -118,8 +118,8 @@ export const agentDBTools: AgentDBTool[] = [
         },
     },
     {
-        name: "agentdb_read_workspace",
-        title: "Read AgentDB Workspace",
+        name: "tabula_read_workspace",
+        title: "Read Tabula Workspace",
         description: "Read workspace metadata by workspace name.",
         inputSchema: workspaceSchema,
         annotations: readOnly(),
@@ -129,7 +129,7 @@ export const agentDBTools: AgentDBTool[] = [
         },
     },
     {
-        name: "agentdb_list_workspace_entities",
+        name: "tabula_list_workspace_entities",
         title: "List Workspace Root Entities",
         description: "List ordered root object IDs for a workspace name.",
         inputSchema: workspaceSchema,
@@ -140,8 +140,8 @@ export const agentDBTools: AgentDBTool[] = [
         },
     },
     {
-        name: "agentdb_read_entity",
-        title: "Read AgentDB Entity",
+        name: "tabula_read_entity",
+        title: "Read Tabula Entity",
         description: "Read one object or block as a parent-aware recursive entity tree.",
         inputSchema: entityIDSchema,
         annotations: readOnly(),
@@ -152,7 +152,7 @@ export const agentDBTools: AgentDBTool[] = [
         },
     },
     {
-        name: "agentdb_list_entity_children",
+        name: "tabula_list_entity_children",
         title: "List Entity Children",
         description: "List ordered direct child IDs for one object or block.",
         inputSchema: entityIDSchema,
@@ -164,8 +164,8 @@ export const agentDBTools: AgentDBTool[] = [
         },
     },
     {
-        name: "agentdb_search_entities",
-        title: "Search AgentDB Entities",
+        name: "tabula_search_entities",
+        title: "Search Tabula Entities",
         description: "Search object names/properties and block content/properties in a workspace.",
         inputSchema: searchSchema,
         annotations: readOnly(),
@@ -175,8 +175,8 @@ export const agentDBTools: AgentDBTool[] = [
         },
     },
     {
-        name: "agentdb_create_object",
-        title: "Create AgentDB Object",
+        name: "tabula_create_object",
+        title: "Create Tabula Object",
         description: "Create one named object with optional properties and optional parent.",
         inputSchema: createObjectSchema,
         annotations: mutation({ idempotentHint: false }),
@@ -188,8 +188,8 @@ export const agentDBTools: AgentDBTool[] = [
         },
     },
     {
-        name: "agentdb_create_block",
-        title: "Create AgentDB Block",
+        name: "tabula_create_block",
+        title: "Create Tabula Block",
         description: "Create one content block with optional properties under an object or block parent.",
         inputSchema: createBlockSchema,
         annotations: mutation({ idempotentHint: false }),
@@ -201,8 +201,8 @@ export const agentDBTools: AgentDBTool[] = [
         },
     },
     {
-        name: "agentdb_write_entity",
-        title: "Write AgentDB Entity Tree",
+        name: "tabula_write_entity",
+        title: "Write Tabula Entity Tree",
         description: "Create or replace one recursive public object or block entity tree.",
         inputSchema: writeEntitySchema,
         annotations: mutation({ idempotentHint: false }),
@@ -214,8 +214,8 @@ export const agentDBTools: AgentDBTool[] = [
         },
     },
     {
-        name: "agentdb_delete_entity",
-        title: "Delete AgentDB Entity",
+        name: "tabula_delete_entity",
+        title: "Delete Tabula Entity",
         description: "Delete one object or block and its descendants.",
         inputSchema: entityIDSchema,
         annotations: destructive(),
@@ -226,8 +226,8 @@ export const agentDBTools: AgentDBTool[] = [
         },
     },
     {
-        name: "agentdb_delete_workspace",
-        title: "Delete AgentDB Workspace",
+        name: "tabula_delete_workspace",
+        title: "Delete Tabula Workspace",
         description: "Delete one managed workspace by workspace name.",
         inputSchema: workspaceSchema,
         annotations: destructive(),
@@ -238,8 +238,8 @@ export const agentDBTools: AgentDBTool[] = [
     },
 ];
 
-export function registerAgentDBTools(server: McpServer): void {
-    for (const tool of agentDBTools) {
+export function registerTabulaTools(server: McpServer): void {
+    for (const tool of tabulaTools) {
         server.registerTool(
             tool.name,
             {
@@ -437,11 +437,11 @@ function result(output: unknown): ToolResult {
 function toolError(error: unknown): ToolResult {
     const output = {
         error: {
-            code: error instanceof MCPInputError || error instanceof AgentDBInputError
+            code: error instanceof MCPInputError || error instanceof TabulaInputError
                 ? error.code
                 : "OPERATION_FAILED",
             message: error instanceof Error ? error.message : String(error),
-            ...((error instanceof MCPInputError || error instanceof AgentDBInputError)
+            ...((error instanceof MCPInputError || error instanceof TabulaInputError)
                 && error.details !== undefined
                 ? { details: error.details }
                 : {}),

@@ -2,7 +2,7 @@ import { type Dirent, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const WorkspaceDirectoryName = ".agentdb";
+const WorkspaceDirectoryName = ".tabula";
 const DatabaseExtension = ".sqlite";
 const WorkspaceNamePattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 

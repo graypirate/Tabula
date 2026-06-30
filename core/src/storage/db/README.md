@@ -1,12 +1,12 @@
 # Database Schema
 
-One SQLite database file represents one AgentDB database. The database contains
+One SQLite database file represents one Tabula workspace. The workspace contains
 one metadata row, a base `nodes` table with a row for the database itself,
 subtype tables for objects and blocks, and one ordered containment table.
 
 IDs are stable primary keys:
 
-- `d_` for databases
+- `d_` for workspaces
 - `o_` for objects
 - `b_` for blocks
 
@@ -21,8 +21,8 @@ CREATE TABLE "database" (
 ```
 
 The table contains exactly one row, and that row has a matching `nodes` row
-with type `database`. The name is optional. New databases use schema version
-`0.0.3`. Initialization rejects databases whose metadata declares another
+with type `database`. The name is optional. New workspaces use schema version
+`0.0.3`. Initialization rejects workspaces whose metadata declares another
 version; migrations are not currently supported.
 
 ## Nodes
@@ -34,7 +34,7 @@ CREATE TABLE nodes (
 );
 ```
 
-Databases, objects, and blocks share this base table so containment edges can
+Workspaces, objects, and blocks share this base table so containment edges can
 point at a database, object, or block parent while object and block subtype data
 remains in concrete tables.
 
@@ -49,9 +49,9 @@ CREATE TABLE objects (
 );
 ```
 
-Objects do not store a parent column. Database roots are represented by
-`edges` rows whose parent is the database ID. Database roots must be
-objects. Moving an object to the database root removes its previous parent
+Objects do not store a parent column. Workspace roots are represented by
+`edges` rows whose parent is the workspace ID. Workspace roots must be
+objects. Moving an object to the workspace root removes its previous parent
 edge.
 
 ## Blocks

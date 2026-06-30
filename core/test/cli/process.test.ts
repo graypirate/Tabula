@@ -32,7 +32,7 @@ describe("CLI process output", () => {
 
         expect(await successfulJSON<string[]>(["list"])).toEqual(["alpha", "beta"]);
 
-        const betaPath = join(tempDirectory!, ".agentdb", `${firstWorkspace}.sqlite`);
+        const betaPath = join(tempDirectory!, ".tabula", `${firstWorkspace}.sqlite`);
         writeFileSync(`${betaPath}-wal`, "");
         writeFileSync(`${betaPath}-shm`, "");
 
@@ -66,7 +66,7 @@ describe("CLI process output", () => {
             name: workspaceName,
             schemaVersion: "0.0.3",
         });
-        expect(existsSync(join(tempDirectory!, ".agentdb", `${workspaceName}.sqlite`))).toBe(true);
+        expect(existsSync(join(tempDirectory!, ".tabula", `${workspaceName}.sqlite`))).toBe(true);
         expect(await successfulJSON<WorkspaceMetadata>([
             "read",
             "--workspace",
@@ -130,7 +130,7 @@ describe("CLI process output", () => {
             workspaceName,
         ], JSON.stringify({
             type: "object",
-            name: "AgentDB",
+            name: "Tabula",
             properties: { stage: "MVP" },
             children: [{
                 type: "block",
@@ -391,7 +391,7 @@ describe("CLI process output", () => {
         expect(JSON.parse(missing.stderr)).toMatchObject({
             error: { code: "WORKSPACE_OPEN_FAILED" },
         });
-        expect(existsSync(join(tempDirectory!, ".agentdb", `${workspaceName}.sqlite`))).toBe(false);
+        expect(existsSync(join(tempDirectory!, ".tabula", `${workspaceName}.sqlite`))).toBe(false);
 
         const existingWorkspaceName = "existing";
         const initialized = await successfulJSON<WorkspaceMetadata>([
@@ -430,7 +430,7 @@ describe("CLI process output", () => {
 });
 
 function createWorkspaceName(name = "agent"): string {
-    tempDirectory = mkdtempSync(join(tmpdir(), "agentdb-cli-"));
+    tempDirectory = mkdtempSync(join(tmpdir(), "tabula-cli-"));
     return name;
 }
 

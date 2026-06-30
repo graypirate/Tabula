@@ -1,35 +1,35 @@
-# AgentDB MCP
+# Tabula MCP
 
-Local stdio MCP server for AgentDB. This package is a transport adapter and uses AgentDB exclusively through the public `agentdb` package API.
+Local stdio MCP server for Tabula. This package is a transport adapter and uses Tabula exclusively through the public `tabula` package API.
 
 ## Global Installation
 
-This installs the `agentdb-mcp` executable and a compatible AgentDB Core library. [Install AgentDB Core globally](../core/README.md#global-installation) as well when you want its standalone CLI.
+After the package is published, this installs the `tabula-mcp` executable and a compatible Tabula Core library from the npm registry. [Install Tabula Core globally](../core/README.md#global-installation) as well when you want its standalone CLI.
 
 ```bash
-bun add --global agentdb-mcp
+bun add --global tabula-mcp
 ```
 
 Verify:
 ```bash
-command -v agentdb-mcp
+command -v tabula-mcp
 ```
 
 Upgrade or remove the MCP package with Bun:
 ```bash
-bun update --global agentdb-mcp
-bun remove --global agentdb-mcp
+bun update --global tabula-mcp
+bun remove --global tabula-mcp
 ```
 
-AgentDB MCP uses stdio. The MCP client starts and owns the server process; do not run it as a background daemon.
+Tabula MCP uses stdio. The MCP client starts and owns the server process; do not run it as a background daemon.
 
 ## Configure a Client
 
 ```json
 {
   "mcpServers": {
-    "agentdb": {
-      "command": "agentdb-mcp",
+    "tabula": {
+      "command": "tabula-mcp",
       "args": []
     }
   }
@@ -38,22 +38,22 @@ AgentDB MCP uses stdio. The MCP client starts and owns the server process; do no
 
 The client launches the server over stdio. No daemon is required. For desktop
 clients that do not inherit the shell `PATH`, use the absolute path returned by
-`command -v agentdb-mcp`.
+`command -v tabula-mcp`.
 
 ## Tools
 
-- `agentdb_initialize_workspace`
-- `agentdb_list_workspaces`
-- `agentdb_read_workspace`
-- `agentdb_list_workspace_entities`
-- `agentdb_read_entity`
-- `agentdb_list_entity_children`
-- `agentdb_search_entities`
-- `agentdb_create_object`
-- `agentdb_create_block`
-- `agentdb_write_entity`
-- `agentdb_delete_entity`
-- `agentdb_delete_workspace`
+- `tabula_initialize_workspace`
+- `tabula_list_workspaces`
+- `tabula_read_workspace`
+- `tabula_list_workspace_entities`
+- `tabula_read_entity`
+- `tabula_list_entity_children`
+- `tabula_search_entities`
+- `tabula_create_object`
+- `tabula_create_block`
+- `tabula_write_entity`
+- `tabula_delete_entity`
+- `tabula_delete_workspace`
 
 Each tool accepts one JSON object. The server does not accept CLI arguments,
 stdin payloads, file payloads, SQLite paths, or hidden secondary inputs.
